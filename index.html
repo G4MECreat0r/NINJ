@@ -247,6 +247,70 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
 .tray-slot .lv{position:absolute; bottom:-3px; right:-3px; background:var(--gold); color:#3a2200; font-size:8px; font-weight:800; border-radius:6px; padding:0 3px;}
 @keyframes trayPulse{0%,100%{box-shadow:0 0 10px #ffd16688, 0 0 20px #ffd16644;} 50%{box-shadow:0 0 18px #ffd166cc, 0 0 36px #ffd16688;}}
 
+/* ───── アシェン専用アルティメット（滅世の咆哮） ───── */
+.ult-btn{
+  position:absolute; right:calc(var(--safe-right) + 56px); bottom:calc(var(--safe-bottom) + 8px);
+  width:54px; height:54px; border-radius:50%; z-index:5; pointer-events:auto;
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  background:radial-gradient(circle at 35% 30%, #ffb37a, #ff6b35 55%, #7a1d00 100%);
+  border:2px solid rgba(255,200,140,.8);
+  box-shadow:0 0 14px rgba(255,107,53,.55), inset 0 0 10px rgba(0,0,0,.3);
+  font-size:22px; color:#fff;
+  transition:transform .08s ease;
+}
+.ult-btn:active{transform:scale(.94);}
+.ult-btn .ult-cd-label{
+  position:absolute; inset:0; border-radius:50%;
+  background:rgba(0,0,0,.62);
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:800; color:#ffd166;
+}
+.ult-btn .ult-cd-ring{
+  position:absolute; inset:-2px; border-radius:50%;
+  background:conic-gradient(rgba(0,0,0,.7) calc(var(--cd-pct,0)*1%), transparent 0);
+  pointer-events:none;
+}
+.ult-btn.ready{animation:ultPulse 1.4s ease-in-out infinite;}
+.ult-btn.disabled{filter:grayscale(.5); opacity:.85;}
+@keyframes ultPulse{
+  0%,100%{box-shadow:0 0 14px rgba(255,107,53,.55), inset 0 0 10px rgba(0,0,0,.3);}
+  50%{box-shadow:0 0 28px rgba(255,150,80,.9), 0 0 46px rgba(255,90,20,.5), inset 0 0 10px rgba(0,0,0,.3);}
+}
+
+/* ───── 確定演出オーバーレイ：滅世の咆哮 ───── */
+.ult-cutscene{
+  position:fixed; inset:0; z-index:60; display:none;
+  align-items:center; justify-content:center;
+  overflow:hidden; background:#000;
+}
+.ult-cutscene.active{display:flex;}
+.ult-cutscene canvas{position:absolute; inset:0; width:100%; height:100%;}
+.ult-cutscene .ult-title{
+  position:relative; z-index:2; text-align:center; opacity:0;
+  font-size:clamp(26px,8vw,46px); letter-spacing:.08em;
+  color:#fff; text-shadow:0 0 18px #ff6b35, 0 0 40px #ff2200;
+}
+.ult-cutscene .ult-title .sub{
+  display:block; margin-top:8px; font-size:clamp(12px,3.4vw,15px);
+  letter-spacing:.3em; color:#ffd9b0; text-shadow:0 0 10px #ff6b35;
+}
+@keyframes ultTitleIn{
+  0%{opacity:0; transform:scale(1.4); letter-spacing:.4em;}
+  100%{opacity:1; transform:scale(1); letter-spacing:.08em;}
+}
+@keyframes ultTitleHold{0%,100%{opacity:1;} }
+@keyframes ultTitleOut{0%{opacity:1;} 100%{opacity:0;}}
+@keyframes ultFlashWhite{
+  0%{background:#000;} 4%{background:#fff;} 8%{background:#000;}
+  100%{background:transparent;}
+}
+.ult-skip{
+  position:absolute; bottom:calc(var(--safe-bottom) + 16px); right:calc(var(--safe-right) + 16px);
+  z-index:3; font-size:11px; color:rgba(255,255,255,.55);
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.25);
+  border-radius:20px; padding:6px 14px; pointer-events:auto;
+}
+
 /* level up modal */
 .overlay{position:absolute; inset:0; background:rgba(5,7,16,.82); z-index:20; display:none; flex-direction:column; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(2px);}
 .overlay.active{display:flex;}
@@ -595,7 +659,19 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
       <div id="joyStick"></div>
     </div>
     <div class="weapon-tray" id="weaponTray"></div>
+    <div class="ult-btn" id="btnUltimate" style="display:none;">
+      <div class="ult-cd-ring" id="ultCdRing"></div>
+      <span id="ultIcon">🌋</span>
+      <div class="ult-cd-label" id="ultCdLabel" style="display:none;"></div>
+    </div>
     <div class="toast" id="toast"></div>
+
+    <!-- アシェン専用確定演出：滅世の咆哮 -->
+    <div class="ult-cutscene" id="ultCutscene">
+      <canvas id="ultCanvas"></canvas>
+      <div class="ult-title" id="ultTitleText">滅世の咆哮<span class="sub">ASHEN REQUIEM</span></div>
+      <div class="ult-skip" id="ultSkipBtn">タップでスキップ</div>
+    </div>
 
     <!-- level up overlay -->
     <div class="overlay" id="overlayLevelUp">
@@ -788,6 +864,9 @@ const SFX = (function(){
     gachaBurstR(){ sweep(300,700,0.5,'sine',0.12); },
     gachaBurstSR(){ sweep(300,1000,0.6,'sine',0.14); tone(1200,0.3,'triangle',0.08,0.2); },
     gachaBurstSSR(){ sweep(200,1400,0.9,'sawtooth',0.16); [800,1000,1300,1600].forEach((f,i)=>tone(f,0.4,'triangle',0.1,0.3+i*0.08)); noiseBurst(0.5,0.1,0.1); },
+    ultCharge(){ sweep(80,40,1.2,'sawtooth',0.18); noiseBurst(1.2,0.07,0.1); },
+    ultImpact(){ sweep(50,500,0.5,'sawtooth',0.22); noiseBurst(0.8,0.18,0.05); [60,90,130].forEach((f,i)=>tone(f,0.8,'square',0.16,i*0.04)); },
+    ultRoar(){ [110,165,220,330].forEach((f,i)=>tone(f,0.9,'sawtooth',0.13,i*0.1)); noiseBurst(1.5,0.09,0.2); },
   };
 })();
 
@@ -1748,7 +1827,7 @@ const WEAPONS = {
 
   // アシェン専用：灰燼の業炎
   ashenveil_blaze: {
-    name:'灰燼の業炎', icon:'🔥', maxLv:8,
+    name:'灰燼の業炎', icon:'🌋', maxLv:8,
     evoPassive: null,
     ssr: true, ssrOwner:'ashenveil',
     evoName:'滅世の焦土【アポカリプス】', evoIcon:'☄️',
@@ -2669,6 +2748,7 @@ function newGame(){
     shake:0,
     input:{x:0,y:0,active:false},
     stageState: getInitialStageState(),
+    ultimate: { cd:0, maxCd:45, active:false },
   };
   // starting weapon
   addOrLevelWeapon(charDef.startWeapon);
@@ -2677,6 +2757,7 @@ function newGame(){
   hideAllOverlays();
   updateGoalBanner();
   startAutosaveLoop();
+  updateUltimateButton();
 }
 
 function addOrLevelWeapon(id){
@@ -3934,7 +4015,13 @@ function checkGoal(){
    MAIN UPDATE / RENDER LOOP — fully real-time, no turns ever
 ============================================================ */
 function update(dt){
-  if(!game || !game.running || game.paused) return;
+  if(!game || !game.running) return;
+  if(game.ultimate && game.ultimate.active){
+    // 演出中：プレイヤー操作・敵処理は止めるが、画面外のアニメ進行用にtだけ進める
+    updateUltimateCutscene(dt);
+    return;
+  }
+  if(game.paused) return;
   game.t += dt;
   const p = game.player;
 
@@ -3995,6 +4082,14 @@ function update(dt){
       ? p.maxHp * 0.025  // 最終進化後：毎秒2.5%回復
       : p.maxHp * 0.012; // 通常：毎秒1.2%回復
     p.hp = Math.min(p.maxHp, p.hp + regenRate * dt);
+  }
+
+  // アシェン専用アルティメット：クールダウン進行
+  if(game.ultimate && game.charDef.id === 'ashenveil'){
+    if(game.ultimate.cd>0){
+      game.ultimate.cd = Math.max(0, game.ultimate.cd-dt);
+      updateUltimateButton();
+    }
   }
 
   updateHUD();
@@ -4397,7 +4492,7 @@ function drawPlayerShapeStroke(ctx, shapeId, r){
 /* ============================================================
    HUD
 ============================================================ */
-function refreshHUDStatic(){ rebuildTray(); }
+function refreshHUDStatic(){ rebuildTray(); updateUltimateButton(); }
 function updateHUD(){
   if(!game) return;
   const p = game.player;
@@ -4463,6 +4558,209 @@ function togglePause(forceState){
     persistSave();
   }
   document.getElementById('overlayPause').classList.toggle('active', newPaused && levelUpQueue<=0);
+}
+
+/* ============================================================
+   アシェン専用アルティメット：滅世の咆哮（確定演出）
+============================================================ */
+function updateUltimateButton(){
+  const btn = document.getElementById('btnUltimate');
+  if(!btn) return;
+  if(!game || game.charDef.id !== 'ashenveil'){
+    btn.style.display='none';
+    return;
+  }
+  btn.style.display='flex';
+  const cdLabel = document.getElementById('ultCdLabel');
+  const ring = document.getElementById('ultCdRing');
+  const cd = game.ultimate.cd, maxCd = game.ultimate.maxCd;
+  if(cd>0){
+    btn.classList.remove('ready');
+    btn.classList.add('disabled');
+    cdLabel.style.display='flex';
+    cdLabel.textContent = Math.ceil(cd);
+    ring.style.setProperty('--cd-pct', Math.round((cd/maxCd)*100));
+  } else {
+    btn.classList.add('ready');
+    btn.classList.remove('disabled');
+    cdLabel.style.display='none';
+    ring.style.setProperty('--cd-pct', 0);
+  }
+}
+
+function tryActivateUltimate(){
+  if(!game || !game.running || game.charDef.id !== 'ashenveil') return;
+  if(game.ultimate.active || game.ultimate.cd>0 || game.paused) return;
+  if(document.getElementById('overlayLevelUp').classList.contains('active')) return;
+  startUltimateCutscene();
+}
+document.getElementById('btnUltimate').addEventListener('click', tryActivateUltimate);
+
+let ultPhaseT = 0, ultPhase = 0, ultResolved = false;
+// phase 0: 暗転＋タイトルイン (0 -> 1.6s)
+// phase 1: チャージ（魔女のシルエット＋渦巻く炎、タイトル保持） (1.6 -> 4.6s)
+// phase 2: 大爆発フラッシュ＋衝撃波（このタイミングで敵全滅を確定） (4.6 -> 5.4s)
+// phase 3: 燃え尽きる世界の余韻（タイトルアウト） (5.4 -> 9.0s)
+const ULT_PHASE_T = [1.6, 3.0, 0.8, 3.6]; // 各フェーズの長さ（合計 ≈9s）
+
+function startUltimateCutscene(){
+  game.ultimate.active = true;
+  game.paused = true; // レベルアップ等のオーバーレイが裏で起動しないようにする
+  ultPhaseT = 0; ultPhase = 0; ultResolved = false;
+  document.getElementById('overlayPause').classList.remove('active');
+
+  const cs = document.getElementById('ultCutscene');
+  const titleEl = document.getElementById('ultTitleText');
+  titleEl.style.animation = 'none';
+  void titleEl.offsetWidth; // reflow
+  cs.classList.add('active');
+  setupUltCanvas();
+  SFX.ultCharge();
+  if(navigator.vibrate) navigator.vibrate([60,30,60,30,200]);
+
+  document.getElementById('ultSkipBtn').onclick = ()=>{ skipUltimateCutscene(); };
+}
+
+function setupUltCanvas(){
+  const c = document.getElementById('ultCanvas');
+  c.width = innerWidth*DPR; c.height = innerHeight*DPR;
+  ultCtx = c.getContext('2d');
+  ultParticles = [];
+  for(let i=0;i<70;i++){
+    ultParticles.push({
+      ang: Math.random()*Math.PI*2,
+      dist: 60+Math.random()*260,
+      spd: 0.4+Math.random()*1.2,
+      r: 2+Math.random()*5,
+      hueShift: Math.random(),
+    });
+  }
+}
+let ultCtx=null, ultParticles=[];
+
+function updateUltimateCutscene(dt){
+  ultPhaseT += dt;
+  const titleEl = document.getElementById('ultTitleText');
+  if(game.shake>0) game.shake = Math.max(0, game.shake-dt*30);
+
+  if(ultPhase===0){
+    const p = Math.min(1, ultPhaseT/ULT_PHASE_T[0]);
+    titleEl.style.opacity = p;
+    titleEl.style.transform = `scale(${1.4-0.4*p})`;
+    titleEl.style.letterSpacing = `${0.4-0.32*p}em`;
+    if(ultPhaseT>=ULT_PHASE_T[0]){ ultPhase=1; ultPhaseT=0; }
+  } else if(ultPhase===1){
+    titleEl.style.opacity = 1;
+    titleEl.style.transform = 'scale(1)';
+    titleEl.style.letterSpacing = '0.08em';
+    if(ultPhaseT>=ULT_PHASE_T[1]){ ultPhase=2; ultPhaseT=0; SFX.ultImpact(); SFX.ultRoar(); if(navigator.vibrate) navigator.vibrate([200,60,300]); }
+  } else if(ultPhase===2){
+    if(!ultResolved){
+      ultResolved = true;
+      resolveUltimateKillAll();
+    }
+    if(ultPhaseT>=ULT_PHASE_T[2]){ ultPhase=3; ultPhaseT=0; }
+  } else if(ultPhase===3){
+    const p = Math.min(1, ultPhaseT/ULT_PHASE_T[3]);
+    titleEl.style.opacity = Math.max(0, 1-p*1.3);
+    if(ultPhaseT>=ULT_PHASE_T[3]){ endUltimateCutscene(); return; }
+  }
+  renderUltimateCutscene(dt);
+}
+
+function resolveUltimateKillAll(){
+  // 画面内の敵を全滅させる（ボスも含む。XP・ドロップは通常通り発生）
+  const targets = game.enemies.filter(e=>!e.dead);
+  for(const e of targets){
+    e.hp = 0;
+    killEnemy(e);
+  }
+  game.enemies = game.enemies.filter(e=>!e.dead);
+  game.shake = 26;
+}
+
+function renderUltimateCutscene(dt){
+  if(!ultCtx) return;
+  const ctx = ultCtx;
+  ctx.save();
+  ctx.scale(DPR,DPR);
+  const cx = innerWidth/2, cy = innerHeight/2;
+
+  if(ultPhase===0){
+    ctx.fillStyle = 'rgba(5,0,0,'+Math.min(1, ultPhaseT*1.5)+')';
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+  } else if(ultPhase===1){
+    // 渦巻く灰燼のエネルギー：背景暗転＋うねる炎パーティクルがプレイヤー中心に収束
+    ctx.fillStyle = '#0a0000';
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+    const prog = ultPhaseT/ULT_PHASE_T[1];
+    // 中心グロー（だんだん強くなる）
+    const glow = ctx.createRadialGradient(cx,cy,0,cx,cy,260);
+    glow.addColorStop(0, `rgba(255,180,80,${0.15+prog*0.35})`);
+    glow.addColorStop(0.5, `rgba(255,90,20,${0.10+prog*0.25})`);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+    for(const pt of ultParticles){
+      pt.ang += pt.spd*dt*1.4;
+      pt.dist -= dt*(40+prog*90);
+      if(pt.dist<10) pt.dist = 240+Math.random()*60;
+      const x = cx + Math.cos(pt.ang)*pt.dist;
+      const y = cy + Math.sin(pt.ang)*pt.dist*0.7;
+      const hue = 18 + pt.hueShift*30;
+      ctx.beginPath();
+      ctx.fillStyle = `hsla(${hue},100%,${55+pt.hueShift*25}%,${0.55+prog*0.35})`;
+      ctx.shadowColor = `hsla(${hue},100%,60%,0.9)`;
+      ctx.shadowBlur = 14;
+      ctx.arc(x,y,pt.r,0,7);
+      ctx.fill();
+    }
+    ctx.shadowBlur=0;
+  } else if(ultPhase===2){
+    // 大爆発フラッシュ
+    const prog = ultPhaseT/ULT_PHASE_T[2];
+    const flashA = prog<0.25 ? 1 : Math.max(0, 1-(prog-0.25)/0.75);
+    ctx.fillStyle = `rgba(255,255,255,${flashA})`;
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+    if(flashA<0.97){
+      const ringR = prog*Math.max(innerWidth,innerHeight)*1.1;
+      ctx.strokeStyle = `rgba(255,140,60,${1-prog})`;
+      ctx.lineWidth = 40*(1-prog)+6;
+      ctx.beginPath(); ctx.arc(cx,cy,ringR,0,7); ctx.stroke();
+      ctx.fillStyle = `rgba(20,0,0,${Math.min(0.9,prog*1.4)})`;
+      ctx.fillRect(0,0,innerWidth,innerHeight);
+    }
+  } else if(ultPhase===3){
+    // 余韻：暗く焦げた赤に落ち着き、ゆっくり消えていく燃えかす
+    const prog = ultPhaseT/ULT_PHASE_T[3];
+    ctx.fillStyle = `rgba(15,2,0,${Math.max(0,0.85-prog*0.85)})`;
+    ctx.fillRect(0,0,innerWidth,innerHeight);
+    for(const pt of ultParticles){
+      pt.dist += dt*18;
+      const x = cx + Math.cos(pt.ang)*pt.dist;
+      const y = cy + Math.sin(pt.ang)*pt.dist*0.7 - prog*60;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255,140,70,${Math.max(0,0.5-prog*0.5)})`;
+      ctx.arc(x,y,pt.r*0.7,0,7);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function skipUltimateCutscene(){
+  if(!ultResolved){ ultResolved=true; resolveUltimateKillAll(); }
+  endUltimateCutscene();
+}
+
+function endUltimateCutscene(){
+  document.getElementById('ultCutscene').classList.remove('active');
+  game.ultimate.active = false;
+  game.ultimate.cd = game.ultimate.maxCd;
+  game.paused = false;
+  updateUltimateButton();
+  // 演出中に溜まったレベルアップキューを処理
+  if(typeof levelUpQueue!=='undefined' && levelUpQueue>0) tryShowLevelUp();
 }
 
 async function endGame(survived){
