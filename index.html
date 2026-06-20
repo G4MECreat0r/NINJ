@@ -554,7 +554,7 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
       <div class="hud-info">
         <div>撃破 <b id="hudKills">0</b></div>
         <div>✦ <b id="hudShards">0</b></div>
-        <div>Wave <b id="hudWave">1</b></div>
+        <div id="hudStage" style="color:var(--gold);font-weight:700;">1-1</div>
       </div>
     </div>
     <div class="mute-btn" id="btnMuteGame">🔊</div>
@@ -954,6 +954,127 @@ const SHAPES = {
   star:(ctx,r)=>{ ctx.beginPath(); for(let i=0;i<10;i++){ const a=Math.PI/5*i-Math.PI/2; const rad= i%2===0?r:r*0.45; const x=Math.cos(a)*rad, y=Math.sin(a)*rad; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);} ctx.closePath(); ctx.fill(); },
   drop:(ctx,r)=>{ ctx.beginPath(); ctx.moveTo(0,-r*1.2); ctx.quadraticCurveTo(r,r*0.2,0,r); ctx.quadraticCurveTo(-r,r*0.2,0,-r*1.2); ctx.closePath(); ctx.fill(); },
 };
+
+/* ============================================================
+   PLAYER SVG IMAGE CACHE
+   SVGをDataURLに変換してCanvasに直接描画できるようにする
+============================================================ */
+const _playerImgCache = {};
+function getPlayerImg(charId){
+  if(_playerImgCache[charId] && _playerImgCache[charId].complete) return _playerImgCache[charId];
+  const svgStr = charSvg(charId, 80);
+  const encoded = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+  const img = new Image();
+  img.src = encoded;
+  _playerImgCache[charId] = img;
+  return img;
+}
+// ゲーム開始前に全キャラを事前ロード
+function preloadAllCharImgs(){
+  CHARACTERS.forEach(c=> getPlayerImg(c.id));
+}
+
+/* ============================================================
+   STAGE SYSTEM — 1-1、1-2、2-1 形式
+   ボスを倒すとステージが進む。同ワールド内のステージをクリアすると次のワールドへ
+============================================================ */
+const WORLDS = [
+  {
+    id:'forest', name:'亡霊の森', worldNum:1,
+    bgColor:'#0b0e1a', gridColor:'rgba(61,220,151,0.07)',
+    borderColor:'rgba(61,220,151,0.3)',
+    stages:[
+      {stageNum:1, desc:'静かな森の入口', enemyWeights:{slime:14,bat:8,golem:2,wisp:3}, bossId:'wraithlord', goalSec:90},
+      {stageNum:2, desc:'森の奥深く。敵が増える', enemyWeights:{slime:10,bat:12,golem:5,wisp:6}, bossId:'wraithlord', goalSec:90},
+      {stageNum:3, desc:'森の主が待ち構える', enemyWeights:{slime:8,bat:10,golem:8,wisp:7,charger:3}, bossId:'wraithlord', goalSec:90},
+    ],
+  },
+  {
+    id:'ruins', name:'廃墟の戦場', worldNum:2,
+    bgColor:'#110a08', gridColor:'rgba(255,122,69,0.07)',
+    borderColor:'rgba(255,122,69,0.4)',
+    stages:[
+      {stageNum:1, desc:'燃える廃墟。突進型が現れる', enemyWeights:{slime:5,bat:8,golem:8,wisp:6,charger:7}, bossId:'flamecolossus', goalSec:100},
+      {stageNum:2, desc:'廃墟の深部。炎が激化する', enemyWeights:{bat:8,golem:10,wisp:8,charger:10,phantom:3}, bossId:'flamecolossus', goalSec:100},
+      {stageNum:3, desc:'炎の番人との決戦', enemyWeights:{bat:5,golem:8,wisp:8,charger:12,phantom:6}, bossId:'flamecolossus', goalSec:100},
+    ],
+  },
+  {
+    id:'abyss', name:'深淵の回廊', worldNum:3,
+    bgColor:'#08080f', gridColor:'rgba(192,132,255,0.08)',
+    borderColor:'rgba(192,132,255,0.45)',
+    stages:[
+      {stageNum:1, desc:'虚無の入口。幽霊が徘徊する', enemyWeights:{golem:8,wisp:10,charger:8,phantom:10}, bossId:'voidhunter', goalSec:120},
+      {stageNum:2, desc:'次元の狭間。視界が歪む', enemyWeights:{golem:6,wisp:12,charger:9,phantom:14,titan:2}, bossId:'voidhunter', goalSec:120},
+      {stageNum:3, desc:'深淵の主との決戦', enemyWeights:{golem:5,wisp:10,charger:8,phantom:16,titan:4}, bossId:'voidhunter', goalSec:120},
+    ],
+  },
+  {
+    id:'inferno', name:'業火の最深部', worldNum:4,
+    bgColor:'#110500', gridColor:'rgba(255,60,0,0.09)',
+    borderColor:'rgba(255,60,0,0.5)',
+    stages:[
+      {stageNum:1, desc:'地獄の門。全ての敵が押し寄せる', enemyWeights:{bat:5,golem:8,charger:12,phantom:10,titan:6}, bossId:'abysslord', goalSec:150},
+      {stageNum:2, desc:'業火の最深部。逃げ場なし', enemyWeights:{bat:4,golem:6,charger:14,phantom:12,titan:10}, bossId:'abysslord', goalSec:150},
+      {stageNum:3, desc:'終焉の王との最終決戦', enemyWeights:{golem:4,charger:12,phantom:14,titan:14}, bossId:'abysslord', goalSec:150},
+    ],
+  },
+];
+
+// ゲーム状態にステージ情報を追加するためのデフォルト
+function getInitialStageState(){
+  return { worldIdx:0, stageIdx:0, bossSpawned:false, bossDefeated:false, stageTimer:0 };
+}
+
+function getCurrentWorld(){ return WORLDS[game.stageState.worldIdx] || WORLDS[WORLDS.length-1]; }
+function getCurrentStageData(){
+  const w = getCurrentWorld();
+  return w.stages[game.stageState.stageIdx] || w.stages[w.stages.length-1];
+}
+function getCurrentStage(){ return getCurrentWorld(); } // 互換性のため残す
+
+function getStageName(){
+  const w = getCurrentWorld();
+  const s = getCurrentStageData();
+  return w.worldNum+'-'+s.stageNum+'  '+w.name;
+}
+
+// ボスを倒したときにステージを進める
+function advanceStage(){
+  const w = getCurrentWorld();
+  const ss = game.stageState;
+  ss.bossDefeated = true;
+  ss.bossSpawned = false;
+
+  if(ss.stageIdx < w.stages.length - 1){
+    // 同ワールド内の次のステージへ
+    ss.stageIdx++;
+    ss.stageTimer = 0;
+    const s = getCurrentStageData();
+    const newName = w.worldNum+'-'+s.stageNum;
+    spawnFloatText(game.player.x, game.player.y-100, '✨ ステージクリア！ → '+newName, '#ffd166', 20);
+    showToast('✨ '+newName+' '+w.name+'　'+s.desc);
+    if(navigator.vibrate) navigator.vibrate([50,30,80]);
+  } else if(ss.worldIdx < WORLDS.length - 1){
+    // 次のワールドへ
+    ss.worldIdx++;
+    ss.stageIdx = 0;
+    ss.stageTimer = 0;
+    const nw = getCurrentWorld();
+    const ns = getCurrentStageData();
+    const newName = nw.worldNum+'-'+ns.stageNum;
+    spawnFloatText(game.player.x, game.player.y-100, '🌟 ワールドクリア！ → '+newName+' '+nw.name, '#ffd166', 22);
+    showToast('🌟 ワールド突入：'+nw.worldNum+'-'+ns.stageNum+' '+nw.name+'　'+ns.desc);
+    SFX.boss();
+    if(navigator.vibrate) navigator.vibrate([80,40,80,40,120]);
+  } else {
+    // 全ステージ制覇
+    spawnFloatText(game.player.x, game.player.y-100, '👑 全ステージ制覇！', '#ffd166', 24);
+    showToast('👑 全ステージ制覇！あとは生き残るのみ！');
+  }
+  ss.bossDefeated = false;
+  BGM.playBattle();
+}
 
 // charSvg: オリジナルSVGデザイン。レア度が高いほど装飾が豪華
 function charSvg(id, size){
@@ -2097,9 +2218,11 @@ function newGame(){
     nextBossAt:180,
     shake:0,
     input:{x:0,y:0,active:false},
+    stageState: getInitialStageState(),
   };
   // starting weapon
   addOrLevelWeapon(charDef.startWeapon);
+  preloadAllCharImgs();
   refreshHUDStatic();
   hideAllOverlays();
   updateGoalBanner();
@@ -2175,55 +2298,94 @@ function evolveWeapon(wId){
 
 /* ---------- enemy types ---------- */
 const ENEMY_TYPES = [
-  {id:'slime', icon:'#7ad19a', r:13, hp:14, spd:62, dmg:7, xp:2, weight:10},
-  {id:'bat',   icon:'#c084ff', r:10, hp:8,  spd:128,dmg:5, xp:2, weight:7, erratic:true},
-  {id:'golem', icon:'#d99a55', r:20, hp:60, spd:38, dmg:16,xp:6, weight:4},
-  {id:'wisp',  icon:'#5cd6ff', r:11, hp:20, spd:90, dmg:9, xp:3, weight:6, ranged:true},
+  // ステージ1: 亡霊の森
+  {id:'slime',   icon:'#7ad19a', r:13, hp:14,   spd:62,  dmg:7,  xp:2,  weight:10},
+  {id:'bat',     icon:'#c084ff', r:10, hp:8,    spd:128, dmg:5,  xp:2,  weight:7,  erratic:true},
+  {id:'golem',   icon:'#d99a55', r:20, hp:60,   spd:38,  dmg:16, xp:6,  weight:4},
+  {id:'wisp',    icon:'#5cd6ff', r:11, hp:20,   spd:90,  dmg:9,  xp:3,  weight:6,  ranged:true},
+  // ステージ2: 廃墟の戦場
+  {id:'charger', icon:'#ff7a45', r:15, hp:35,   spd:190, dmg:18, xp:5,  weight:0,  charger:true},
+  // ステージ3: 深淵の回廊
+  {id:'phantom', icon:'#9040d0', r:13, hp:28,   spd:80,  dmg:12, xp:4,  weight:0,  ranged:true, erratic:true, phasing:true},
+  // ステージ4: 業火の最深部
+  {id:'titan',   icon:'#ff5050', r:26, hp:180,  spd:50,  dmg:28, xp:14, weight:0,  armored:true},
 ];
 const BOSS_TYPES = [
-  {id:'wraithlord', icon:'#ff5470', r:34, hp:900, spd:55, dmg:26, xp:80, name:'呪縛の王'},
-  {id:'flamecolossus', icon:'#ff9f45', r:38, hp:1500, spd:48, dmg:32, xp:120, name:'業火の巨像'},
+  {id:'wraithlord',     icon:'#ff5470', r:34, hp:900,  spd:55, dmg:26, xp:80,  name:'呪縛の王',     phase:0},
+  {id:'flamecolossus',  icon:'#ff9f45', r:38, hp:1500, spd:48, dmg:32, xp:120, name:'業火の巨像',   phase:1},
+  {id:'voidhunter',     icon:'#c084ff', r:32, hp:2200, spd:70, dmg:28, xp:160, name:'虚空の狩人',   phase:2, ranged:true},
+  {id:'abysslord',      icon:'#ff3030', r:44, hp:3500, spd:42, dmg:38, xp:220, name:'深淵の覇者',   phase:3, armored:true},
 ];
 
 function timeScale(){
-  // gentle, capped scaling so numbers don't run away ("inflation" the user dislikes)
   const minutes = game.t/60;
-  return {
-    hp: 1 + Math.min(minutes*0.16, 4.0),
-    dmg: 1 + Math.min(minutes*0.10, 2.2),
-    spawn: Math.max(0.32, 1.1 - minutes*0.045),
-  };
+  const worldIdx = game.stageState.worldIdx;
+  const stageIdx = game.stageState.stageIdx;
+  const phase = worldIdx + stageIdx*0.3;
+  const hpMul  = 1 + Math.min(minutes*0.18 + phase*0.5 + Math.pow(Math.max(0,minutes-4)*0.05,2), 10.0);
+  const dmgMul = 1 + Math.min(minutes*0.10 + phase*0.25, 5.0);
+  const spawnInterval = Math.max(0.14, 1.0 - minutes*0.04 - worldIdx*0.08 - stageIdx*0.04);
+  return { hp: hpMul, dmg: dmgMul, spawn: spawnInterval };
 }
 
 function pickEnemyType(){
-  const total = ENEMY_TYPES.reduce((s,e)=>s+e.weight,0);
+  const sd = getCurrentStageData();
+  const weights = sd.enemyWeights;
+  const pool = ENEMY_TYPES.filter(e=>(weights[e.id]||0)>0).map(e=>({...e, weight:weights[e.id]}));
+  if(!pool.length) return ENEMY_TYPES[0];
+  const total = pool.reduce((s,e)=>s+e.weight,0);
   let r = Math.random()*total;
-  for(const e of ENEMY_TYPES){ r-=e.weight; if(r<=0) return e; }
-  return ENEMY_TYPES[0];
+  for(const e of pool){ r-=e.weight; if(r<=0) return e; }
+  return pool[pool.length-1];
 }
 
+let _lastStageKey = null;
 function spawnEnemy(forceBoss){
   const ts = timeScale();
+  const world = getCurrentWorld();
+  const sd = getCurrentStageData();
+  const stageKey = world.id+'-'+sd.stageNum;
+
+  // ステージ切り替えのアナウンスは advanceStage() 内でやる
+
   const ang = Math.random()*Math.PI*2;
-  const dist = 420 + Math.random()*120;
+  const dist = 420 + Math.random()*140;
   const x = game.player.x + Math.cos(ang)*dist;
   const y = game.player.y + Math.sin(ang)*dist;
+
   let type, isBoss=false;
   if(forceBoss){
-    type = BOSS_TYPES[Math.min(BOSS_TYPES.length-1, Math.floor(game.bossesKilled))];
+    const bt = BOSS_TYPES.find(b=>b.id===sd.bossId) || BOSS_TYPES[0];
+    type = bt;
     isBoss = true;
+    game.stageState.bossSpawned = true;
   } else {
     type = pickEnemyType();
   }
-  game.enemies.push({
+
+  const worldBonus  = 1 + world.worldNum * 0.3;
+  const stageBonus  = 1 + sd.stageNum  * 0.15;
+
+  const enemy = {
     type:type.id, x, y, r:type.r,
-    hp: type.hp*ts.hp, maxHp:type.hp*ts.hp,
-    spd:type.spd, dmg:type.dmg*ts.dmg, xp:type.xp,
-    isBoss, color:type.icon, erratic:type.erratic, ranged:type.ranged,
-    wobble:Math.random()*Math.PI*2, atkCd:Math.random()*1.5+0.6, name:type.name,
-  });
+    hp:   type.hp * ts.hp * worldBonus * stageBonus,
+    maxHp:type.hp * ts.hp * worldBonus * stageBonus,
+    spd:  type.spd*(1+world.worldNum*0.07),
+    dmg:  type.dmg * ts.dmg * worldBonus,
+    xp:type.xp,
+    isBoss, color:type.icon,
+    erratic:type.erratic, ranged:type.ranged,
+    charger:type.charger, phasing:type.phasing, armored:type.armored,
+    wobble:Math.random()*Math.PI*2,
+    atkCd:Math.random()*1.5+0.6,
+    name:type.name||type.id,
+    chargeTimer: type.charger ? 2+Math.random()*2 : 0,
+    charging:false, chargeVx:0, chargeVy:0,
+  };
+  game.enemies.push(enemy);
+
   if(isBoss){
-    spawnFloatText(game.player.x, game.player.y-120, '⚠ ボス出現：'+type.name, '#ff5470', 20);
+    spawnFloatText(game.player.x, game.player.y-120, '⚠ ボス出現：'+(type.name||type.id), '#ff5470', 20);
     SFX.boss();
     BGM.playBoss();
   }
@@ -2267,7 +2429,10 @@ function dealDamage(enemy, dmg, critChance){
 function killEnemy(enemy){
   enemy.dead = true;
   game.kills++;
-  if(enemy.isBoss){ game.bossesKilled++; BGM.playBattle(); }
+  if(enemy.isBoss){
+    game.bossesKilled++;
+    advanceStage();
+  }
   SFX.kill();
   spawnParticles(enemy.x,enemy.y,enemy.color,16);
   gainXP(enemy.xp);
@@ -2794,18 +2959,55 @@ function updateEnemies(dt){
     if(e.dead) continue;
     e.wobble += dt*4;
     let spd = e.spd;
-    if(e.slowTimer>0){ e.slowTimer-=dt; spd *= (1-e.slowAmt); }
-    let ang = Math.atan2(p.y-e.y, p.x-e.x);
-    if(e.erratic) ang += Math.sin(e.wobble)*0.6;
-    e.x += Math.cos(ang)*spd*dt;
-    e.y += Math.sin(ang)*spd*dt;
+    if(e.slowTimer>0){ e.slowTimer-=dt; spd *= (1-(e.slowAmt||0)); }
+
+    if(e.charger){
+      // チャージャー：溜めて突進
+      if(!e.charging){
+        e.chargeTimer -= dt;
+        // 通常より遅めに近づく
+        const ang = Math.atan2(p.y-e.y, p.x-e.x);
+        e.x += Math.cos(ang)*spd*0.4*dt;
+        e.y += Math.sin(ang)*spd*0.4*dt;
+        if(e.chargeTimer <= 0){
+          // 突進開始
+          e.charging = true;
+          const a = Math.atan2(p.y-e.y, p.x-e.x);
+          e.chargeVx = Math.cos(a)*spd*3.5;
+          e.chargeVy = Math.sin(a)*spd*3.5;
+          e.chargeDur = 0.55;
+          spawnFloatText(e.x, e.y-20, '突進！', '#ff7a45', 13);
+        }
+      } else {
+        e.x += e.chargeVx*dt;
+        e.y += e.chargeVy*dt;
+        e.chargeDur -= dt;
+        if(e.chargeDur <= 0){
+          e.charging = false;
+          e.chargeTimer = 2.5 + Math.random()*2;
+          e.chargeVx = 0; e.chargeVy = 0;
+        }
+      }
+    } else if(e.phasing){
+      // ファントム：ふらふら近づいてすり抜けるように攻撃
+      const ang = Math.atan2(p.y-e.y, p.x-e.x) + Math.sin(e.wobble*0.7)*1.2;
+      e.x += Math.cos(ang)*spd*dt;
+      e.y += Math.sin(ang)*spd*dt;
+    } else {
+      let ang = Math.atan2(p.y-e.y, p.x-e.x);
+      if(e.erratic) ang += Math.sin(e.wobble)*0.6;
+      e.x += Math.cos(ang)*spd*dt;
+      e.y += Math.sin(ang)*spd*dt;
+    }
 
     const d = Math.hypot(p.x-e.x,p.y-e.y);
     if(d < p.r+e.r){
       e.atkCd -= dt;
       if(e.atkCd<=0){
-        e.atkCd = 0.7;
-        damagePlayer(e.dmg);
+        // アーマード敵は防御を下げる特殊効果付き
+        const dmgBonus = e.armored ? 1.4 : 1;
+        e.atkCd = e.charger ? 0.3 : 0.7;
+        damagePlayer(e.dmg * dmgBonus);
       }
     }
   }
@@ -2975,15 +3177,23 @@ function update(dt){
   // spawning
   game.spawnTimer -= dt;
   const ts = timeScale();
+  const world = getCurrentWorld();
+  const sd = getCurrentStageData();
+  const worldIdx = game.stageState.worldIdx;
+  const stageIdx = game.stageState.stageIdx;
+
   if(game.spawnTimer<=0){
     game.spawnTimer = ts.spawn;
-    const count = 1 + Math.floor(game.t/45);
-    for(let i=0;i<Math.min(count,5);i++) spawnEnemy(false);
+    const baseCount = 1 + Math.floor(game.t/30) + worldIdx + stageIdx;
+    const maxCount  = 3 + worldIdx*3 + stageIdx;
+    const count = Math.min(baseCount, maxCount);
+    for(let i=0;i<count;i++) spawnEnemy(false);
   }
-  if(game.t >= game.nextBossAt){
+
+  // ステージ内でボスを1体スポーン（ステージ開始から goalSec 秒後）
+  game.stageState.stageTimer += dt;
+  if(!game.stageState.bossSpawned && game.stageState.stageTimer >= sd.goalSec){
     spawnEnemy(true);
-    game.nextBossAt += 200;
-    game.wave++;
   }
 
   updateWeapons(dt);
@@ -3020,21 +3230,22 @@ function render(){
   if(game.shake>0){ shakeX=(Math.random()-0.5)*game.shake; shakeY=(Math.random()-0.5)*game.shake; }
   ctx.translate(shakeX,shakeY);
 
-  // background grid
-  ctx.fillStyle = '#0b0e1a';
+  // background — ステージの色を反映
+  const world = getCurrentWorld();
+  ctx.fillStyle = world.bgColor || '#0b0e1a';
   ctx.fillRect(0,0,innerWidth,innerHeight);
   const gridSize=80;
   const off = worldToScreen(0,0);
-  ctx.strokeStyle = 'rgba(124,92,255,0.07)';
+  ctx.strokeStyle = world.gridColor || 'rgba(124,92,255,0.07)';
   ctx.lineWidth=1;
   const startX = ((off.x)%gridSize+gridSize)%gridSize;
   const startY = ((off.y)%gridSize+gridSize)%gridSize;
   for(let x=startX;x<innerWidth;x+=gridSize){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,innerHeight); ctx.stroke(); }
   for(let y=startY;y<innerHeight;y+=gridSize){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(innerWidth,y); ctx.stroke(); }
 
-  // arena bounds glow
+  // arena bounds glow — ステージカラー
   const tl = worldToScreen(0,0), br = worldToScreen(ARENA.w,ARENA.h);
-  ctx.strokeStyle = 'rgba(255,122,69,0.35)';
+  ctx.strokeStyle = world.borderColor || 'rgba(255,122,69,0.35)';
   ctx.lineWidth=4;
   ctx.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
 
@@ -3197,17 +3408,26 @@ function render(){
     ctx.fillRect(s.x-w/2, s.y-e.r-10, w*Math.max(0,e.hp/e.maxHp), 4);
   }
 
-  // player — distinct shape + color per character, so each one looks different on-field
+  // player — SVGキャラ画像をそのまま描画
   const ps = worldToScreen(game.player.x, game.player.y);
   ctx.save();
   ctx.translate(ps.x, ps.y);
-  if(game.player.iframe>0 && Math.floor(game.t*20)%2===0) ctx.globalAlpha=0.4;
-  ctx.fillStyle = game.player.color;
-  ctx.shadowColor=game.player.color; ctx.shadowBlur=16;
-  drawPlayerShape(ctx, game.player.shape, game.player.r);
-  ctx.shadowBlur=0;
-  ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=2;
-  drawPlayerShapeStroke(ctx, game.player.shape, game.player.r);
+  if(game.player.iframe>0 && Math.floor(game.t*20)%2===0) ctx.globalAlpha=0.35;
+  const drawSize = game.player.r * 3.2; // キャラ画像の表示サイズ
+  const img = getPlayerImg(game.charDef.id);
+  if(img && img.complete && img.naturalWidth > 0){
+    // グロー効果
+    ctx.shadowColor = game.player.color;
+    ctx.shadowBlur = 18;
+    ctx.drawImage(img, -drawSize/2, -drawSize/2, drawSize, drawSize);
+    ctx.shadowBlur = 0;
+  } else {
+    // フォールバック: カラー丸
+    ctx.fillStyle = game.player.color;
+    ctx.shadowColor = game.player.color; ctx.shadowBlur=16;
+    ctx.beginPath(); ctx.arc(0,0,game.player.r,0,7); ctx.fill();
+    ctx.shadowBlur=0;
+  }
   ctx.restore();
 
   // particles
@@ -3261,7 +3481,8 @@ function updateHUD(){
   document.getElementById('hudTimer').textContent = fmtTime(game.t);
   document.getElementById('hudKills').textContent = game.kills;
   document.getElementById('hudShards').textContent = game.shardsEarned;
-  document.getElementById('hudWave').textContent = game.wave;
+  const w = getCurrentWorld(); const sd = getCurrentStageData();
+  document.getElementById('hudStage').textContent = w.worldNum+'-'+sd.stageNum+' '+w.name;
   updateGoalBanner();
 }
 
