@@ -168,6 +168,23 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
 .rarity-tag.sr{background:rgba(92,214,255,.22); color:#9fe6ff;}
 .rarity-tag.ssr{background:rgba(255,209,102,.25); color:#ffe199;}
 
+.ach-progress-wrap{margin-top:7px;}
+.ach-progress-bar{
+  width:100%; height:7px; border-radius:5px; background:var(--bg2);
+  border:1px solid var(--panel-edge); overflow:hidden;
+}
+.ach-progress-fill{
+  height:100%; border-radius:5px;
+  background:linear-gradient(90deg, var(--violet-dim), var(--violet));
+  transition:width .3s ease;
+}
+.ach-progress-fill.near{background:linear-gradient(90deg, #ff9f45, var(--gold));}
+.ach-progress-label{
+  font-size:10.5px; color:var(--text-dim); margin-top:3px;
+  display:flex; justify-content:space-between;
+}
+.ach-progress-label b{color:var(--text); font-weight:700;}
+
 .shard-pill{
   display:flex; align-items:center; gap:6px; background:var(--bg2); border:1px solid var(--panel-edge);
   border-radius:20px; padding:6px 12px; font-size:13px; font-weight:700; color:var(--gold);
@@ -1887,9 +1904,12 @@ const ACHIEVEMENTS = [
   {id:'boss1',     name:'初撃破',       icon:'🐉', desc:'ボスを1体倒す', reward:40, check:(r)=>r.bosses>=1},
   {id:'noHit',     name:'無傷の達人',   icon:'🕊️', desc:'5分間ノーダメージで生存する', reward:60, check:(r)=>r.maxNoHitTime>=300},
   // 新実績
-  {id:'bosses10',     name:'ボス10体撃破',    icon:'💥', desc:'累計でボスを10体倒す', reward:120, check:(r)=>r.totalBosses>=10},
-  {id:'runs20',        name:'20回プレイ',       icon:'🎮', desc:'累計20回プレイする', reward:100, check:(r)=>r.totalRuns>=20},
-  {id:'kills1000000',  name:'一万の屍',         icon:'💀', desc:'累計撃破数1万体を達成する（廃人への道）', reward:500, check:(r)=>r.totalKills>=10000},
+  {id:'bosses10',     name:'ボス10体撃破',    icon:'💥', desc:'累計でボスを10体倒す', reward:120, check:(r)=>r.totalBosses>=10,
+   progress:(s)=>({current:s.totalBosses||0, target:10})},
+  {id:'runs20',        name:'20回プレイ',       icon:'🎮', desc:'累計20回プレイする', reward:100, check:(r)=>r.totalRuns>=20,
+   progress:(s)=>({current:s.totalRuns||0, target:20})},
+  {id:'kills1000000',  name:'五万の屍',         icon:'💀', desc:'累計撃破数5万体を達成する（廃人への道）', reward:500, check:(r)=>r.totalKills>=50000,
+   progress:(s)=>({current:s.totalKills||0, target:50000})},
 ];
 
 // Goals shown before each run — escalate as the player's best record grows,
@@ -2053,6 +2073,20 @@ function renderCharList(){
       const ach = ACHIEVEMENTS.find(a=>a.id===c.unlock.id);
       actionHtml = `<span class="badge">${ach?ach.name:'実績'}</span>`;
     }
+    let unlockProgressHtml = '';
+    if(!unlocked && c.unlock.type==='achievement'){
+      const ach = ACHIEVEMENTS.find(a=>a.id===c.unlock.id);
+      if(ach && typeof ach.progress === 'function'){
+        const prog = ach.progress(save);
+        const cur = Math.min(prog.current, prog.target);
+        const pct = Math.max(0, Math.min(100, (cur/prog.target)*100));
+        unlockProgressHtml = `
+          <div class="ach-progress-wrap">
+            <div class="ach-progress-bar"><div class="ach-progress-fill${pct>=80?' near':''}" style="width:${pct}%;"></div></div>
+            <div class="ach-progress-label"><span>${ach.desc}</span><b>${cur.toLocaleString()} / ${prog.target.toLocaleString()}</b></div>
+          </div>`;
+      }
+    }
     card.innerHTML = `
       <div class="card-icon" style="background:${charIconBg(c)};overflow:hidden;">${unlocked? charIconHtml(c,48) : '<span style="font-size:26px;">🔒</span>'}</div>
       <div class="card-body">
@@ -2063,7 +2097,7 @@ function renderCharList(){
           <div style="margin-top:5px;font-size:10px;background:rgba(255,209,102,0.12);border:1px solid rgba(255,209,102,0.3);border-radius:6px;padding:3px 7px;color:#ffd166;">
             🌟 刻印武器：${WEAPONS[c.startWeapon]?.name || c.startWeapon}（最終進化で真の力を解放）
           </div>
-        ` : `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${c.unlock.type==='gacha'?'未解放：ガチャでのみ入手可能':(c.unlock.type==='shard'?'魂のかけらで解放':'実績達成で解放')}</div>`}
+        ` : `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${c.unlock.type==='gacha'?'未解放：ガチャでのみ入手可能':(c.unlock.type==='shard'?'魂のかけらで解放':'実績達成で解放')}</div>${unlockProgressHtml}`}
       </div>
       <div class="card-action">${actionHtml}</div>
     `;
@@ -2592,11 +2626,24 @@ function renderAch(){
     const done = !!save.achievements[a.id];
     const card = document.createElement('div');
     card.className = 'card' + (done?'':' locked');
+    let progressHtml = '';
+    if(!done && typeof a.progress === 'function'){
+      const prog = a.progress(save);
+      const cur = Math.min(prog.current, prog.target);
+      const pct = Math.max(0, Math.min(100, (cur/prog.target)*100));
+      const near = pct>=80;
+      progressHtml = `
+        <div class="ach-progress-wrap">
+          <div class="ach-progress-bar"><div class="ach-progress-fill${near?' near':''}" style="width:${pct}%;"></div></div>
+          <div class="ach-progress-label"><span>進行度</span><b>${cur.toLocaleString()} / ${prog.target.toLocaleString()}</b></div>
+        </div>`;
+    }
     card.innerHTML = `
       <div class="card-icon">${done? a.icon : '🔒'}</div>
       <div class="card-body">
         <div class="card-title">${a.name}</div>
         <div class="card-desc">${a.desc}</div>
+        ${progressHtml}
       </div>
       <div class="card-action">${done?`<span class="badge done">+✦${a.reward}</span>`:`<span class="badge">✦${a.reward}</span>`}</div>
     `;
