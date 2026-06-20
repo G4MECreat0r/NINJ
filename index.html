@@ -1674,7 +1674,7 @@ const CHARACTERS = [
   // ─── 新SSRキャラ ───────────────────────────────────
   {id:'ashenveil', name:'灰燼の魔女アシェン', title:'百万の魂を灰にした者',
    tags:['⚔️ 攻撃','💨 速度','🔥 炎熱'], tagVals:['神域','速い','MAX'],
-   startWeapon:'ashenveil_blaze', hpMul:1.0, spdMul:1.25, dmgMul:2.0, rarity:3, shape:'flame', color:'#ff6b35', accent:'#ffe0d0',
+   startWeapon:'ashenveil_blaze', hpMul:1.15, spdMul:1.25, dmgMul:2.6, rarity:3, shape:'flame', color:'#ff6b35', accent:'#ffe0d0',
    unlock:{type:'achievement', id:'kills1000000'}},
 
   {id:'ironwarden', name:'鋼鉄の守護者アイゼン', title:'不壊の鉄壁',
@@ -3242,10 +3242,10 @@ function weaponBaseStats(id, w){
     case 'ashenveil_blaze':
       // 灰燼の業炎：全方向爆炎、最終進化で画面全域
       return {
-        cooldown: w.evolved ? 0.15 : Math.max(0.5, 1.6-lv*0.12),
-        dmg: (18+lv*8) * (w.evolved ? 4.0 : 1.0),
+        cooldown: w.evolved ? 0.45 : Math.max(0.45, 1.2-lv*0.1),
+        dmg: (26+lv*9) * (w.evolved ? 7.0 : 1.0),
         radius: (w.evolved ? 600 : 130)*game.player.areaMul,
-        count: w.evolved ? 24 : 6+lv,
+        count: w.evolved ? 12 : 8+lv,
         pierce: 99,
         sig: true,
         ssr: true,
@@ -3441,7 +3441,7 @@ function fireWeapon(id, w, stats){
         dmg: stats.dmg*p.dmgMul,
         r: w.evolved ? 28 : 14,
         blastR: stats.radius/(count*0.5),
-        life: w.evolved ? 1.4 : 0.9,
+        life: 0.9, lifeMax: 0.9,
         pierce: 99, hitSet: new Set(),
         color:'#ff6b35', weaponId: id, sig:true,
       });
@@ -3464,14 +3464,21 @@ function fireWeapon(id, w, stats){
         hit++;
       }
     }
-    // 最終進化：反撃衝撃波（追加ダメージ波）
+    // 通常攻撃でも見える盾リング（拡大して消える、ダメージ判定なし）
+    game.projectiles.push({
+      type:'nova', x:p.x, y:p.y,
+      dmg:0, r:0, radius:0, maxRadius:radius,
+      life:0.3, life0:0.3, hitSet:new Set(),
+      color:'#94a3b8', weaponId:id, sig:false, visualOnly:true,
+    });
+    // 最終進化：反撃衝撃波（追加ダメージ波・大きく広がる）
     if(w.evolved && stats.shockwaveDmg){
       game.projectiles.push({
         type:'nova', x:p.x, y:p.y,
         dmg: stats.shockwaveDmg*p.dmgMul,
-        radius: 0, maxRadius: radius*1.5,
-        life: 0.4, hitSet: new Set(),
-        color:'#94a3b8', weaponId: id, sig:true,
+        r: 0, radius: 0, maxRadius: radius*1.5,
+        life: 0.4, life0: 0.4, hitSet: new Set(),
+        color:'#cfe0ff', weaponId: id, sig:true,
       });
     }
     spawnParticles(p.x, p.y, '#94a3b8', hit>0?12:4);
@@ -3577,6 +3584,9 @@ function updateProjectiles(dt){
       if(pr.y >= pr.targetY){ pr.y = pr.targetY; pr.impacted=true; }
     } else if(pr.type==='wave' || pr.type==='frost'){
       pr.r += (pr.maxR/(pr.sig?0.75:0.5))*dt;
+    } else if(pr.type==='nova'){
+      // 不壊の要塞壁・反撃衝撃波：外側へ拡大するリング
+      pr.r += (pr.maxRadius/Math.max(0.05,pr.life0||0.4))*dt;
     } else if(pr.type==='solball'){
       // 星命球：外に飛んで少し減速
       pr.vx *= 0.97; pr.vy *= 0.97;
@@ -3694,6 +3704,21 @@ function updateProjectiles(dt){
           if(pr.type==='frost'){ e.slowTimer = 1.6; e.slowAmt = pr.slow; }
         }
       }
+    } else if(pr.type==='nova'){
+      // 不壊の要塞壁・反撃衝撃波：拡大するリングが触れた敵にダメージ＋ノックバック
+      if(!pr.visualOnly){
+        for(const e of game.enemies){
+          if(e.dead||pr.hitSet.has(e)) continue;
+          const d = Math.hypot(e.x-pr.x,e.y-pr.y);
+          if(Math.abs(d-pr.r) < 30 || d<pr.r){
+            dealDamage(e, pr.dmg, game.player.critChance);
+            pr.hitSet.add(e);
+            const ang = Math.atan2(e.y-pr.y, e.x-pr.x);
+            e.x += Math.cos(ang)*260*0.016;
+            e.y += Math.sin(ang)*260*0.016;
+          }
+        }
+      }
     }
   }
   game.projectiles = game.projectiles.filter(pr=>{
@@ -3702,6 +3727,7 @@ function updateProjectiles(dt){
     if(pr.type==='missile') return pr.life>0 && !pr.dead;
     if(pr.type==='arrowfall') return pr.life>0;
     if(pr.type==='wave' || pr.type==='frost') return pr.life>0;
+    if(pr.type==='nova') return pr.life>0;
     return pr.life>0;
   });
 }
@@ -4097,6 +4123,27 @@ function render(){
         ctx.strokeStyle=`rgba(255,122,69,${alpha})`;
         ctx.lineWidth=6; ctx.beginPath(); ctx.arc(s.x,s.y,pr.r,0,7); ctx.stroke();
       }
+    } else if(pr.type==='nova'){
+      // 不壊の要塞壁：通常は鋼色の控えめなリング、最終進化の反撃衝撃波は青白く派手に
+      ctx.save();
+      const lifeRatioN = Math.max(0, pr.life/(pr.life0||0.4));
+      if(pr.visualOnly){
+        ctx.strokeStyle=`rgba(180,190,210,${lifeRatioN*0.55})`;
+        ctx.lineWidth=4;
+        ctx.beginPath(); ctx.arc(s.x,s.y,pr.r,0,7); ctx.stroke();
+      } else {
+        ctx.shadowColor='#cfe0ff'; ctx.shadowBlur=26;
+        ctx.strokeStyle=`rgba(220,232,255,${lifeRatioN*0.95})`;
+        ctx.lineWidth=8;
+        ctx.beginPath(); ctx.arc(s.x,s.y,pr.r,0,7); ctx.stroke();
+        ctx.strokeStyle=`rgba(148,163,184,${lifeRatioN*0.7})`;
+        ctx.lineWidth=16;
+        ctx.beginPath(); ctx.arc(s.x,s.y,pr.r,0,7); ctx.stroke();
+        // 内側の薄いシールド面
+        ctx.fillStyle=`rgba(148,163,184,${lifeRatioN*0.08})`;
+        ctx.beginPath(); ctx.arc(s.x,s.y,pr.r,0,7); ctx.fill();
+      }
+      ctx.shadowBlur=0; ctx.restore();
     } else if(pr.type==='scythe'){
       // 深淵の大鎌：暗紫の広角薙ぎ払い
       ctx.save();
@@ -4187,17 +4234,45 @@ function render(){
       ctx.shadowBlur=0; ctx.restore();
 
     } else if(pr.type==='fireball'){
-      // 業炎弾：オレンジ赤の炎球
+      // 業炎弾：進行方向に伸びる炎の尾＋白熱コア＋外周の揺らめき
       ctx.save();
-      ctx.shadowColor='#ff4400'; ctx.shadowBlur=22;
-      const fGrad = ctx.createRadialGradient(s.x-pr.r*0.3, s.y-pr.r*0.3, 0, s.x, s.y, pr.r);
-      fGrad.addColorStop(0,'#ffee88');
-      fGrad.addColorStop(0.4,'#ff6b35');
-      fGrad.addColorStop(1,'rgba(180,0,0,0)');
-      ctx.globalAlpha=Math.max(0.2, pr.life/1.4);
+      const lifeMax = pr.lifeMax || (pr.life>0.9?1.4:0.9);
+      const lifeRatioF = Math.max(0.15, pr.life/lifeMax);
+      const ang = Math.atan2(pr.vy||0, pr.vx||1);
+      ctx.translate(s.x, s.y);
+      ctx.rotate(ang);
+
+      // 後方に伸びる炎の尾（彗星状グラデーション）
+      const tailLen = pr.r*3.2;
+      const tailGrad = ctx.createLinearGradient(-tailLen,0,0,0);
+      tailGrad.addColorStop(0,'rgba(255,90,0,0)');
+      tailGrad.addColorStop(0.5,`rgba(255,110,30,${0.35*lifeRatioF})`);
+      tailGrad.addColorStop(1,`rgba(255,200,80,${0.6*lifeRatioF})`);
+      ctx.fillStyle = tailGrad;
+      ctx.beginPath();
+      ctx.moveTo(-tailLen, 0);
+      ctx.quadraticCurveTo(-tailLen*0.4, -pr.r*0.9, 0, -pr.r*0.35);
+      ctx.lineTo(0, pr.r*0.35);
+      ctx.quadraticCurveTo(-tailLen*0.4, pr.r*0.9, -tailLen, 0);
+      ctx.fill();
+
+      // 本体：白熱コア→橙→赤外周のグラデーション球
+      ctx.shadowColor='#ff5500'; ctx.shadowBlur=24;
+      const fGrad = ctx.createRadialGradient(-pr.r*0.2,-pr.r*0.2,0,0,0,pr.r);
+      fGrad.addColorStop(0,'#fffbe0');
+      fGrad.addColorStop(0.35,'#ffd166');
+      fGrad.addColorStop(0.7,'#ff6b35');
+      fGrad.addColorStop(1,'rgba(180,20,0,0.15)');
+      ctx.globalAlpha = lifeRatioF;
       ctx.fillStyle=fGrad;
-      ctx.beginPath(); ctx.arc(s.x,s.y,pr.r,0,7); ctx.fill();
-      ctx.shadowBlur=0; ctx.restore();
+      ctx.beginPath(); ctx.arc(0,0,pr.r,0,7); ctx.fill();
+
+      // ゆらめく外周リング
+      ctx.globalAlpha = lifeRatioF*0.7;
+      ctx.strokeStyle='rgba(255,170,50,0.8)'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.arc(0,0,pr.r*1.25,0,7); ctx.stroke();
+
+      ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
     }
   }
   // chain bolts
