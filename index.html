@@ -213,13 +213,15 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
 .goal-banner.done{border-color:rgba(61,220,151,.6);}
 .goal-banner.done .gtext b{color:var(--mint);}
 
-.pause-btn,.mute-btn{
+.pause-btn,.mute-btn,.lvuphide-btn{
   position:absolute; top:calc(var(--safe-top) + 8px);
   width:36px; height:36px; border-radius:10px; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.15);
   display:flex; align-items:center; justify-content:center; font-size:16px; z-index:6; pointer-events:auto; color:#fff;
 }
 .pause-btn{right:calc(var(--safe-right) + 10px);}
 .mute-btn{right:calc(var(--safe-right) + 52px);}
+.lvuphide-btn{right:calc(var(--safe-right) + 94px); font-size:14px;}
+.lvuphide-btn.active{background:var(--violet); border-color:var(--violet);}
 
 /* joystick */
 #joyZone{position:absolute; left:0; bottom:0; width:46%; height:46%; z-index:4;}
@@ -586,6 +588,7 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
     </div>
     <div class="mute-btn" id="btnMuteGame">🔊</div>
     <div class="pause-btn" id="btnPause">⏸</div>
+    <div class="lvuphide-btn" id="btnLvUpHide" title="武器・パッシブが全てMAXの時、レベルアップ画面を自動スキップ">🃏</div>
 
     <div id="joyZone">
       <div id="joyBase"></div>
@@ -1807,7 +1810,7 @@ const ACHIEVEMENTS = [
   // 新実績
   {id:'bosses10',     name:'ボス10体撃破',    icon:'💥', desc:'累計でボスを10体倒す', reward:120, check:(r)=>r.totalBosses>=10},
   {id:'runs20',        name:'20回プレイ',       icon:'🎮', desc:'累計20回プレイする', reward:100, check:(r)=>r.totalRuns>=20},
-  {id:'kills1000000',  name:'百万の屍',         icon:'💀', desc:'累計撃破数100万体を達成する（廃人への道）', reward:500, check:(r)=>r.totalKills>=1000000},
+  {id:'kills1000000',  name:'一万の屍',         icon:'💀', desc:'累計撃破数1万体を達成する（廃人への道）', reward:500, check:(r)=>r.totalKills>=10000},
 ];
 
 // Goals shown before each run — escalate as the player's best record grows,
@@ -1838,6 +1841,7 @@ let save = {
   adminGodMode:false,
   selectedWorldIdx:0, selectedStageIdx:0,
   adminGameSpeed:1,
+  hideLevelUpWhenMaxed:false,
 };
 
 async function loadSave(){
@@ -2908,8 +2912,38 @@ function queueLevelUp(){
   levelUpQueue++;
   if(!game.paused) tryShowLevelUp();
 }
+
+// 武器・パッシブが「もう成長要素なし（進化・新規取得・レベルアップが全て不可）」かどうかを判定
+function isFullyMaxedOut(){
+  const ownedW = Object.keys(game.weapons);
+  const ownedP = Object.keys(game.passives);
+
+  for(const wid of ownedW){ if(canEvolve(wid)) return false; }
+  if(ownedW.length<6){
+    for(const wid in WEAPONS){
+      if(!game.weapons[wid]){
+        const wdef = WEAPONS[wid];
+        if(wdef.ssr && wdef.ssrOwner !== game.charDef.id) continue;
+        return false;
+      }
+    }
+  }
+  for(const wid of ownedW){ if(game.weapons[wid].lv < WEAPONS[wid].maxLv) return false; }
+  if(ownedP.length<6){
+    for(const pid in PASSIVES){ if(!game.passives[pid]) return false; }
+  }
+  for(const pid of ownedP){ if(game.passives[pid].lv < PASSIVES[pid].maxLv) return false; }
+  return true;
+}
+
 function tryShowLevelUp(){
   if(levelUpQueue<=0) return;
+  // 全アップグレード完了 かつ 報酬画面を非表示に設定している場合は選択肢を出さず自動で消化する
+  if(save.hideLevelUpWhenMaxed && isFullyMaxedOut()){
+    while(levelUpQueue>0){ levelUpQueue--; }
+    game.paused = false;
+    return;
+  }
   game.paused = true;
   SFX.levelup();
   buildLevelUpChoices();
@@ -4456,6 +4490,26 @@ document.getElementById('btnMuteGame').addEventListener('click', ()=>{
 
 document.getElementById('btnPause').addEventListener('click', ()=>togglePause(true));
 document.getElementById('btnResume').addEventListener('click', ()=>{ SFX.button(); togglePause(false); });
+function updateLvUpHideButton(){
+  const btn = document.getElementById('btnLvUpHide');
+  if(!btn) return;
+  btn.classList.toggle('active', !!save.hideLevelUpWhenMaxed);
+  btn.title = save.hideLevelUpWhenMaxed
+    ? '武器・パッシブが全てMAXの時、レベルアップ画面を自動スキップ：ON'
+    : '武器・パッシブが全てMAXの時、レベルアップ画面を自動スキップ：OFF';
+}
+document.getElementById('btnLvUpHide').addEventListener('click', ()=>{
+  save.hideLevelUpWhenMaxed = !save.hideLevelUpWhenMaxed;
+  updateLvUpHideButton();
+  persistSave();
+  SFX.button();
+  showToast(save.hideLevelUpWhenMaxed ? '🃏 全強化済み時のレベルアップ報酬を非表示にしました' : '🃏 レベルアップ報酬を通常通り表示します');
+  // 既にキューが溜まっている場合、即座に反映を試みる
+  if(!game || !game.paused || levelUpQueue<=0) return;
+  if(document.getElementById('overlayLevelUp').classList.contains('active')) return; // 既に表示中の選択画面はそのまま
+  tryShowLevelUp();
+});
+updateLvUpHideButton();
 document.getElementById('btnQuit').addEventListener('click', ()=>{
   SFX.close();
   if(!game) return;
@@ -4552,6 +4606,7 @@ document.getElementById('adminResetSave').addEventListener('click', ()=>{
     adminGodMode:false,
     selectedWorldIdx:0, selectedStageIdx:0,
     adminGameSpeed:1,
+    hideLevelUpWhenMaxed:false,
   };
   refreshMenuStats(); renderCharList(); renderShop(); renderAch(); persistSave();
   closeAdminPanel();
