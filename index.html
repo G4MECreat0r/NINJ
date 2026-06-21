@@ -126,6 +126,72 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
 .menu-buttons .btn{padding:15px;}
 .menu-grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 
+.equipped-title{
+  margin-top:4px; text-align:center; font-size:11px; font-weight:700; letter-spacing:.05em;
+  color:#ffd166; text-shadow:0 0 8px rgba(255,209,102,.5);
+}
+.inferno-menu-btn{
+  background:linear-gradient(135deg, rgba(255,90,20,.18), rgba(120,10,0,.18));
+  border-color:rgba(255,140,60,.4);
+}
+.daily-menu-btn{position:relative;}
+.daily-badge-count{
+  background:var(--danger); color:#fff; font-size:11px; font-weight:800;
+  border-radius:10px; min-width:20px; height:20px; display:flex; align-items:center; justify-content:center; padding:0 6px;
+}
+
+/* ---------- 武具図鑑 ---------- */
+.dex-summary{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--panel); border:1px solid var(--panel-edge); border-radius:14px;
+  padding:12px 16px; margin-bottom:14px; font-size:13px;
+}
+.dex-summary b{color:var(--gold); font-size:16px;}
+.dex-card-icon-locked{filter:grayscale(1) brightness(.4);}
+
+/* ---------- 称号 ---------- */
+.title-equip-btn{
+  border:none; border-radius:10px; padding:8px 12px; font-size:11px; font-weight:700; cursor:pointer;
+  background:var(--violet-dim); color:#fff;
+}
+.title-equip-btn.equipped{background:linear-gradient(135deg,#ffd166,#ff9f45); color:#3a2200;}
+
+/* ---------- デイリーチャレンジ ---------- */
+.daily-streak-banner{
+  background:linear-gradient(135deg, rgba(255,209,102,.12), rgba(255,159,69,.06));
+  border:1px solid rgba(255,209,102,.3); border-radius:14px; padding:12px 16px; margin-bottom:14px;
+  display:flex; align-items:center; gap:10px; font-size:12.5px;
+}
+.daily-streak-banner b{color:#ffd166; font-size:18px;}
+.daily-task-bar{width:100%; height:7px; border-radius:5px; background:var(--bg2); border:1px solid var(--panel-edge); overflow:hidden; margin-top:7px;}
+.daily-task-fill{height:100%; border-radius:5px; background:linear-gradient(90deg, var(--violet-dim), var(--violet)); transition:width .3s ease;}
+.daily-task-fill.complete{background:linear-gradient(90deg, #3ddc97, #1fa874);}
+
+/* ---------- 無限業火モード ---------- */
+.inferno-hero{
+  text-align:center; padding:20px 14px; background:radial-gradient(circle at 50% 0%, rgba(255,107,53,.15), transparent 70%);
+  border:1px solid rgba(255,107,53,.3); border-radius:16px; margin-bottom:14px;
+}
+.inferno-hero-icon{font-size:40px; filter:drop-shadow(0 0 14px rgba(255,107,53,.6));}
+.inferno-hero-title{font-size:18px; font-weight:800; margin-top:6px; color:#ffb37a;}
+.inferno-hero-desc{font-size:12px; color:var(--text-dim); margin-top:6px; line-height:1.5;}
+.inferno-best-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.inferno-best-card{
+  background:var(--panel); border:1px solid var(--panel-edge); border-radius:14px;
+  padding:14px; text-align:center;
+}
+.ibc-label{font-size:11px; color:var(--text-dim);}
+.ibc-value{font-size:22px; font-weight:800; color:#ffd166; margin-top:4px;}
+
+/* ---------- インゲーム：無限業火モード専用HUD ---------- */
+.inferno-wave-hud{
+  position:absolute; top:calc(var(--safe-top) + 8px); left:50%; transform:translateX(-50%);
+  background:rgba(20,5,0,.55); border:1px solid rgba(255,140,60,.4); border-radius:20px;
+  padding:5px 16px; font-size:13px; font-weight:800; color:#ffb37a; z-index:6;
+  display:none; align-items:center; gap:6px;
+}
+.inferno-wave-hud.active{display:flex;}
+
 /* ---------- char select / shop / achievements: card lists ---------- */
 .topbar{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
 .topbar h2{flex:1; font-size:clamp(18px,5vw,22px);}
@@ -497,6 +563,7 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
       <div class="logo-ring"></div>
       <div class="title-jp font-display">ソウル・オービット</div>
       <div class="title-en" id="secretTapTarget">SOUL ORBIT</div>
+      <div class="equipped-title" id="equippedTitleBadge" style="display:none;"></div>
       <div class="stat-strip">
         <div>ベスト生存 <b id="menuBestTime">0:00</b></div>
         <div>総撃破 <b id="menuTotalKills">0</b></div>
@@ -512,11 +579,21 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
         <span>🗺 ステージ選択</span>
         <span id="menuStageLabel" style="color:var(--gold);font-size:13px;">1-1 亡霊の森</span>
       </button>
+      <button class="btn btn-block inferno-menu-btn" id="btnInferno" style="justify-content:space-between;">
+        <span>🔥 無限業火モード</span>
+        <span id="menuInfernoLabel" style="color:var(--gold);font-size:13px;">未解放</span>
+      </button>
+      <button class="btn btn-block daily-menu-btn" id="btnDaily" style="justify-content:space-between;">
+        <span>📅 デイリーチャレンジ</span>
+        <span id="menuDailyLabel" class="daily-badge-count" style="display:none;">0</span>
+      </button>
       <div class="menu-grid2">
         <button class="btn" id="btnCharSelect">🧙 キャラクター</button>
         <button class="btn" id="btnGacha">🔮 ガチャ</button>
         <button class="btn" id="btnShop">🛒 永続強化</button>
         <button class="btn" id="btnAch">🏆 実績</button>
+        <button class="btn" id="btnDex">📖 武具図鑑</button>
+        <button class="btn" id="btnTitles">🎖 称号</button>
       </div>
       <button class="btn btn-ghost btn-block" id="btnMuteToggle">🔊 サウンド：ON</button>
     </div>
@@ -633,6 +710,67 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
     <div class="card-list" id="achList"></div>
   </div>
 
+  <!-- ===== WEAPON DEX (図鑑) ===== -->
+  <div class="screen" id="screen-dex">
+    <div class="bg-glow"></div>
+    <div class="topbar">
+      <button class="icon-btn" id="dexBack">←</button>
+      <h2>武具図鑑</h2>
+    </div>
+    <div class="dex-summary" id="dexSummary"></div>
+    <div class="card-list" id="dexList"></div>
+  </div>
+
+  <!-- ===== TITLES (称号) ===== -->
+  <div class="screen" id="screen-titles">
+    <div class="bg-glow"></div>
+    <div class="topbar">
+      <button class="icon-btn" id="titlesBack">←</button>
+      <h2>称号</h2>
+    </div>
+    <p style="margin-bottom:14px; font-size:12px; color:var(--text-dim);">称号を装着すると、メニューのキャラ名の横に表示されます。</p>
+    <div class="card-list" id="titlesList"></div>
+  </div>
+
+  <!-- ===== DAILY CHALLENGES ===== -->
+  <div class="screen" id="screen-daily">
+    <div class="bg-glow"></div>
+    <div class="topbar">
+      <button class="icon-btn" id="dailyBack">←</button>
+      <h2>デイリーチャレンジ</h2>
+    </div>
+    <div class="daily-streak-banner" id="dailyStreakBanner"></div>
+    <div class="card-list" id="dailyList"></div>
+  </div>
+
+  <!-- ===== INFERNO MODE (無限業火モード) ===== -->
+  <div class="screen" id="screen-inferno">
+    <div class="bg-glow"></div>
+    <div class="topbar">
+      <button class="icon-btn" id="infernoBack">←</button>
+      <h2>無限業火モード</h2>
+    </div>
+    <div id="infernoLockedView" style="display:none;">
+      <div class="card locked" style="flex-direction:column; align-items:flex-start; gap:8px;">
+        <div style="font-size:32px;">🔒</div>
+        <div class="card-title">未解放</div>
+        <div class="card-desc" id="infernoLockDesc"></div>
+      </div>
+    </div>
+    <div id="infernoUnlockedView" style="display:none;">
+      <div class="inferno-hero">
+        <div class="inferno-hero-icon">🔥</div>
+        <div class="inferno-hero-title">終わりなき業火</div>
+        <div class="inferno-hero-desc">全ワールドの敵が入り乱れ、時間経過とともに際限なく強くなる無限ステージ。どこまで生き延びられるか試せ。</div>
+      </div>
+      <div class="inferno-best-grid">
+        <div class="inferno-best-card"><div class="ibc-label">自己ベスト波数</div><div class="ibc-value" id="infernoBestWaveVal">0</div></div>
+        <div class="inferno-best-card"><div class="ibc-label">自己ベスト生存時間</div><div class="ibc-value" id="infernoBestTimeVal">0:00</div></div>
+      </div>
+      <button class="btn btn-primary btn-block" id="btnInfernoStart" style="margin-top:14px;">🔥 無限業火モードへ出撃</button>
+    </div>
+  </div>
+
   <!-- ===== STAGE SELECT ===== -->
   <div class="screen" id="screen-stage">
     <div class="bg-glow"></div>
@@ -643,6 +781,7 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
     <p style="margin-bottom:14px; font-size:12px; color:var(--text-dim);">上位のステージほど強い敵が登場し、報酬も増えます。解放は前のステージをクリアするか挑戦することで開放されます。</p>
     <div class="card-list" id="stageList"></div>
   </div>
+
 
   <!-- ===== GAME ===== -->
   <div class="screen" id="screen-game">
@@ -670,6 +809,7 @@ p{margin:0; color:var(--text-dim); line-height:1.5;}
     <div class="mute-btn" id="btnMuteGame">🔊</div>
     <div class="pause-btn" id="btnPause">⏸</div>
     <div class="lvuphide-btn" id="btnLvUpHide" title="武器・パッシブが全てMAXの時、レベルアップ画面を自動スキップ">🃏</div>
+    <div class="inferno-wave-hud" id="infernoWaveHud">🔥 WAVE <span id="infernoWaveNum">1</span></div>
 
     <div id="joyZone">
       <div id="joyBase"></div>
@@ -1165,12 +1305,35 @@ function getInitialStageState(){
   return { worldIdx:wi, stageIdx:si, bossSpawned:false, bossDefeated:false, stageTimer:0 };
 }
 
-function getCurrentWorld(){ return WORLDS[game.stageState.worldIdx] || WORLDS[WORLDS.length-1]; }
+function getCurrentWorld(){
+  if(game && game.isInferno) return INFERNO_WORLD;
+  return WORLDS[game.stageState.worldIdx] || WORLDS[WORLDS.length-1];
+}
 function getCurrentStageData(){
+  if(game && game.isInferno) return INFERNO_WORLD.stages[0];
   const w = getCurrentWorld();
   return w.stages[game.stageState.stageIdx] || w.stages[w.stages.length-1];
 }
 function getCurrentStage(){ return getCurrentWorld(); } // 互換性のため残す
+
+// ───── 無限業火モード：仮想ワールド ─────
+// 全ステージの敵を混在させ、ボスは出現させずウェーブ制でひたすら難易度上昇する
+const INFERNO_WORLD = {
+  id:'inferno_infinite', name:'業火の深淵', worldNum:99,
+  bgColor:'#0a0000', gridColor:'rgba(255,60,0,0.10)',
+  borderColor:'rgba(255,90,20,0.55)',
+  stages:[
+    {stageNum:1, desc:'終わりなき業火', enemyWeights:{slime:8,bat:7,golem:5,wisp:6,charger:8,phantom:8,titan:5}, bossId:null, goalSec:99999},
+  ],
+};
+const INFERNO_WAVE_DURATION = 45; // 45秒ごとにウェーブが1つ上がる
+function onInfernoWaveUp(){
+  showToast('🔥 WAVE '+game.infernoWave+'！ さらに敵が強化される…');
+  SFX.levelup();
+  game.shake = Math.max(game.shake, 10);
+  const hudNum = document.getElementById('infernoWaveNum');
+  if(hudNum) hudNum.textContent = game.infernoWave;
+}
 
 function getStageName(){
   const w = getCurrentWorld();
@@ -1910,7 +2073,45 @@ const ACHIEVEMENTS = [
    progress:(s)=>({current:s.totalRuns||0, target:20})},
   {id:'kills1000000',  name:'五万の屍',         icon:'💀', desc:'累計撃破数5万体を達成する（廃人への道）', reward:500, check:(r)=>r.totalKills>=50000,
    progress:(s)=>({current:s.totalKills||0, target:50000})},
+  {id:'infernoUnlock', name:'終焉を超えて', icon:'🔥', desc:'業火の最深部 4-3 で15分間生存する（無限業火モードが解放される）', reward:200,
+   check:(r)=>r.isFinalStageRun && r.time>=900},
 ];
+
+// 称号：実績や記録の達成に紐づく名前飾り。メニューで装着でき、キャラ名の横に表示される
+const TITLES = [
+  {id:'t_survive5',   name:'生存者',         source:'achievement:survive5'},
+  {id:'t_survive20',  name:'不屈の魂',       source:'achievement:survive20'},
+  {id:'t_kill1000',   name:'殺戮者',         source:'achievement:kill1000'},
+  {id:'t_evolve3',    name:'三重の覚醒者',   source:'achievement:evolve3'},
+  {id:'t_noHit',      name:'無傷の達人',     source:'achievement:noHit'},
+  {id:'t_bosses10',   name:'討伐者',         source:'achievement:bosses10'},
+  {id:'t_runs20',     name:'歴戦の戦士',     source:'achievement:runs20'},
+  {id:'t_kills1000000', name:'灰燼を見し者', source:'achievement:kills1000000'},
+  {id:'t_inferno1',   name:'業火の挑戦者',   source:'inferno:wave10'},
+  {id:'t_inferno2',   name:'業火を統べる者', source:'inferno:wave25'},
+  {id:'t_inferno3',   name:'終焉を超えし者', source:'inferno:wave50'},
+  {id:'t_dex_full',   name:'武具の蒐集家',   source:'dex:full'},
+  {id:'t_daily7',     name:'日々を重ねる者', source:'daily:streak7'},
+  {id:'t_daily30',    name:'不断の旅人',     source:'daily:streak30'},
+];
+function checkAndGrantTitles(){
+  const newly = [];
+  TITLES.forEach(t=>{
+    if(save.titles.includes(t.id)) return;
+    const [kind, key] = t.source.split(':');
+    let earned = false;
+    if(kind==='achievement') earned = !!save.achievements[key];
+    else if(kind==='inferno') earned = save.infernoBestWave >= Number(key.replace('wave',''));
+    else if(kind==='dex') earned = key==='full' && isWeaponDexComplete();
+    else if(kind==='daily') earned = key==='streak7' ? save.dailyStreak>=7 : (key==='streak30' ? save.dailyStreak>=30 : false);
+    if(earned){
+      save.titles.push(t.id);
+      if(!save.equippedTitle) save.equippedTitle = t.id;
+      newly.push(t);
+    }
+  });
+  return newly;
+}
 
 // Goals shown before each run — escalate as the player's best record grows,
 // so there is always a clear, single, near-term thing to aim for.
@@ -1941,6 +2142,14 @@ let save = {
   selectedWorldIdx:0, selectedStageIdx:0,
   adminGameSpeed:1,
   hideLevelUpWhenMaxed:false,
+  // ─── 無限業火モード ───
+  infernoBestWave:0, infernoBestTime:0, infernoUnlocked:false,
+  // ─── 図鑑（武器：所持/進化済みを記録） ───
+  weaponDex:{}, // { weaponId: {owned:true, evolved:true} }
+  // ─── 称号 ───
+  titles:[], equippedTitle:null,
+  // ─── デイリーチャレンジ ───
+  dailyDate:null, dailyProgress:{}, dailyClaimed:{}, dailyStreak:0, dailyLastClaimDate:null,
 };
 
 async function loadSave(){
@@ -2001,6 +2210,29 @@ function refreshMenuStats(){
   document.getElementById('menuShards').textContent = save.shards;
   document.getElementById('menuGems').textContent = save.gems;
   updateMenuStageLabel();
+  updateMenuInfernoLabel();
+  updateMenuDailyBadge();
+  updateEquippedTitleBadge();
+}
+function updateMenuInfernoLabel(){
+  const el = document.getElementById('menuInfernoLabel');
+  if(!el) return;
+  const unlocked = !!save.achievements['infernoUnlock'];
+  el.textContent = unlocked ? ('Wave '+(save.infernoBestWave||0)+' 到達') : '未解放';
+}
+function updateMenuDailyBadge(){
+  const el = document.getElementById('menuDailyLabel');
+  if(!el) return;
+  const n = countUnclaimedReadyDaily();
+  if(n>0){ el.style.display='flex'; el.textContent = n; }
+  else { el.style.display='none'; }
+}
+function updateEquippedTitleBadge(){
+  const el = document.getElementById('equippedTitleBadge');
+  if(!el) return;
+  const t = TITLES.find(x=>x.id===save.equippedTitle);
+  if(t){ el.style.display='block'; el.textContent = '🎖 '+t.name; }
+  else { el.style.display='none'; }
 }
 function updateMenuStageLabel(){
   const wi = Math.min(save.selectedWorldIdx||0, WORLDS.length-1);
@@ -2017,6 +2249,142 @@ function updateMuteButtons(){
   const gbtn = document.getElementById('btnMuteGame');
   if(gbtn) gbtn.textContent = save.soundOn ? '🔊' : '🔇';
 }
+
+/* ============================================================
+   デイリーチャレンジ
+============================================================ */
+function todayDateStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// 文字列から決定論的な疑似乱数シードを作る（同じ日付なら同じミッション3つになる）
+function seededRandom(seedStr){
+  let h = 0;
+  for(let i=0;i<seedStr.length;i++){ h = (h*31 + seedStr.charCodeAt(i)) >>> 0; }
+  return function(){
+    h = (h*1664525 + 1013904223) >>> 0;
+    return h / 4294967296;
+  };
+}
+const DAILY_TASK_POOL = [
+  {id:'d_kills',    name:'撃破マスター',  icon:'💀', desc:(n)=>`1回のプレイで敵を${n}体倒す`, target:(rnd)=>200+Math.floor(rnd()*400), reward:(n)=>15+Math.floor(n/20),
+   progress:(r,task)=>Math.min(r.kills, task.target)},
+  {id:'d_survive',  name:'耐久の証',      icon:'⏱️', desc:(n)=>`1回のプレイで${Math.floor(n/60)}分${n%60?n%60+'秒':''}生存する`, target:(rnd)=>180+Math.floor(rnd()*420), reward:(n)=>15+Math.floor(n/20),
+   progress:(r,task)=>Math.min(r.time, task.target)},
+  {id:'d_evolve',   name:'進化への道',    icon:'🔱', desc:(n)=>`1回のプレイで武器を${n}つ進化させる`, target:(rnd)=>1+Math.floor(rnd()*2), reward:(n)=>30*n,
+   progress:(r,task)=>Math.min(r.evolved, task.target)},
+  {id:'d_boss',     name:'討伐指令',      icon:'🐉', desc:(n)=>`1回のプレイでボスを${n}体倒す`, target:(rnd)=>1+Math.floor(rnd()*2), reward:(n)=>30*n,
+   progress:(r,task)=>Math.min(r.bosses, task.target)},
+  {id:'d_runs',     name:'出撃命令',      icon:'🎮', desc:(n)=>`${n}回出撃する`, target:(rnd)=>2+Math.floor(rnd()*3), reward:(n)=>10*n,
+   progress:(r,task,allRuns)=>Math.min(allRuns, task.target)},
+  {id:'d_level',    name:'成長の証',      icon:'⭐', desc:(n)=>`1回のプレイでレベル${n}に到達する`, target:(rnd)=>10+Math.floor(rnd()*10), reward:(n)=>Math.floor(n*1.5),
+   progress:(r,task)=>Math.min(r.level, task.target)},
+];
+function getDailyTasks(){
+  // 日付が変わっていたら再生成し、ストリーク（連続達成日数）を判定する
+  const today = todayDateStr();
+  if(save.dailyDate !== today){
+    // 前日分が「3つとも受け取り済み」だったか確認してストリークを更新
+    if(save.dailyDate){
+      const prevAllClaimed = save._dailyPrevAllClaimed;
+      const wasYesterday = isYesterday(save.dailyDate, today);
+      if(prevAllClaimed && wasYesterday){
+        save.dailyStreak = (save.dailyStreak||0)+1;
+      } else if(!wasYesterday || !prevAllClaimed){
+        save.dailyStreak = 0;
+      }
+    }
+    save.dailyDate = today;
+    save.dailyProgress = {};
+    save.dailyClaimed = {};
+    save._dailyPrevAllClaimed = false;
+    save._dailyRunsToday = 0;
+    persistSave();
+  }
+  const rnd = seededRandom(today);
+  // プールからシードで3つ選ぶ（重複なし）
+  const pool = [...DAILY_TASK_POOL];
+  const picked = [];
+  for(let i=0;i<3 && pool.length;i++){
+    const idx = Math.floor(rnd()*pool.length);
+    picked.push(pool.splice(idx,1)[0]);
+  }
+  return picked.map(t=>{
+    const target = t.target(rnd);
+    return { ...t, target, descText: t.desc(target), rewardAmt: t.reward(target) };
+  });
+}
+function isYesterday(dateStr, todayStr){
+  const d1 = new Date(dateStr+'T00:00:00');
+  const d2 = new Date(todayStr+'T00:00:00');
+  const diffDays = Math.round((d2-d1)/86400000);
+  return diffDays === 1;
+}
+function updateDailyProgressFromResult(result){
+  const tasks = getDailyTasks();
+  save._dailyRunsToday = (save._dailyRunsToday||0)+1;
+  tasks.forEach(t=>{
+    const cur = t.progress(result, t, save._dailyRunsToday);
+    const prevBest = save.dailyProgress[t.id]||0;
+    if(cur > prevBest) save.dailyProgress[t.id] = cur;
+  });
+  // 全部受け取り済みかを記録（翌日のストリーク判定用）
+  save._dailyPrevAllClaimed = tasks.every(t=>save.dailyClaimed[t.id]);
+}
+function claimDailyReward(taskId){
+  const tasks = getDailyTasks();
+  const task = tasks.find(t=>t.id===taskId);
+  if(!task || save.dailyClaimed[taskId]) return;
+  const cur = save.dailyProgress[taskId]||0;
+  if(cur < task.target) return;
+  save.dailyClaimed[taskId] = true;
+  save.shards += task.rewardAmt;
+  save._dailyPrevAllClaimed = tasks.every(t=>save.dailyClaimed[t.id]);
+  persistSave();
+  refreshMenuStats();
+  renderDaily();
+  showToast('✅ '+task.name+' 達成！ ✦'+task.rewardAmt+' 獲得');
+  checkAndGrantTitles();
+}
+function countUnclaimedReadyDaily(){
+  const tasks = getDailyTasks();
+  return tasks.filter(t=>(save.dailyProgress[t.id]||0)>=t.target && !save.dailyClaimed[t.id]).length;
+}
+function renderDaily(){
+  const tasks = getDailyTasks();
+  const list = document.getElementById('dailyList');
+  list.innerHTML='';
+  tasks.forEach(t=>{
+    const cur = Math.min(save.dailyProgress[t.id]||0, t.target);
+    const pct = Math.max(0, Math.min(100, (cur/t.target)*100));
+    const ready = cur>=t.target;
+    const claimed = !!save.dailyClaimed[t.id];
+    const card = document.createElement('div');
+    card.className = 'card' + (claimed?'':(ready?'':' locked'));
+    card.innerHTML = `
+      <div class="card-icon">${claimed?'✅':t.icon}</div>
+      <div class="card-body">
+        <div class="card-title">${t.name}</div>
+        <div class="card-desc">${t.descText}</div>
+        <div class="daily-task-bar"><div class="daily-task-fill${ready?' complete':''}" style="width:${pct}%;"></div></div>
+        <div class="ach-progress-label"><span>進行度</span><b>${cur.toLocaleString()} / ${t.target.toLocaleString()}</b></div>
+      </div>
+      <div class="card-action">${
+        claimed ? `<span class="badge done">受取済</span>`
+        : ready ? `<button class="mini-btn gold" data-claim="${t.id}">✦${t.rewardAmt} 受取</button>`
+        : `<span class="badge">✦${t.rewardAmt}</span>`
+      }</div>
+    `;
+    list.appendChild(card);
+  });
+  list.querySelectorAll('[data-claim]').forEach(b=>b.addEventListener('click',e=>{
+    SFX.achieve();
+    claimDailyReward(e.target.getAttribute('data-claim'));
+  }));
+  const streakBanner = document.getElementById('dailyStreakBanner');
+  streakBanner.innerHTML = `<span style="font-size:22px;">🔥</span><div>連続達成 <b>${save.dailyStreak||0}</b> 日目　<span style="color:var(--text-dim);">毎日すべて受け取るとストリークが伸びます</span></div>`;
+}
+
 
 /* ============================================================
    SCREEN MANAGEMENT
@@ -2041,6 +2409,10 @@ function charIconBg(c){ return `radial-gradient(circle at 35% 30%, ${c.accent}44
 function rarityStars(r){ return '★'.repeat(r) + '☆'.repeat(3-r); }
 function rarityClass(r){ return r>=3?'rare-ssr':(r>=2?'rare-sr':'rare-r'); }
 function rarityTag(r){ return r>=3?'SSR':(r>=2?'SR':'R'); }
+
+function isWeaponDexComplete(){
+  return Object.keys(WEAPONS).every(id=>save.weaponDex[id] && save.weaponDex[id].evolved);
+}
 
 /* ============================================================
    CHARACTER SELECT UI
@@ -2652,6 +3024,95 @@ function renderAch(){
 }
 
 /* ============================================================
+   武具図鑑 UI
+============================================================ */
+function renderDex(){
+  const list = document.getElementById('dexList');
+  list.innerHTML='';
+  const ids = Object.keys(WEAPONS);
+  const ownedCount = ids.filter(id=>save.weaponDex[id]?.owned).length;
+  const evolvedCount = ids.filter(id=>save.weaponDex[id]?.evolved).length;
+  document.getElementById('dexSummary').innerHTML = `
+    <div>所持 <b>${ownedCount} / ${ids.length}</b></div>
+    <div>進化済 <b>${evolvedCount} / ${ids.length}</b></div>
+  `;
+  ids.forEach(id=>{
+    const w = WEAPONS[id];
+    const dex = save.weaponDex[id] || {owned:false, evolved:false};
+    const card = document.createElement('div');
+    card.className = 'card' + (dex.owned?'':' locked');
+    const ownerChar = w.ssrOwner ? CHARACTERS.find(c=>c.id===w.ssrOwner) : null;
+    card.innerHTML = `
+      <div class="card-icon${dex.owned?'':' dex-card-icon-locked'}">${dex.owned ? (dex.evolved ? w.evoIcon : w.icon) : '❔'}</div>
+      <div class="card-body">
+        <div class="card-title">${dex.owned ? (dex.evolved ? w.evoName : w.name) : '？？？？？'}${w.ssr?' <span class="rarity-tag ssr">SSR</span>':''}</div>
+        <div class="card-desc">${dex.owned ? w.desc : (ownerChar ? ownerChar.name+'専用武器。キャラを解放して入手しよう' : '入手すると詳細が解放されます')}</div>
+        ${dex.owned && !dex.evolved ? `<div style="margin-top:5px;font-size:10.5px;color:var(--text-dim);">⭐ 進化形態：${w.evoName}（未解放）</div>` : ''}
+      </div>
+      <div class="card-action">${dex.evolved?`<span class="badge done">進化済</span>`:(dex.owned?`<span class="badge">未進化</span>`:`<span class="badge">🔒</span>`)}</div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+/* ============================================================
+   称号 UI
+============================================================ */
+function renderTitles(){
+  const list = document.getElementById('titlesList');
+  list.innerHTML='';
+  checkAndGrantTitles();
+  TITLES.forEach(t=>{
+    const owned = save.titles.includes(t.id);
+    const equipped = save.equippedTitle === t.id;
+    const card = document.createElement('div');
+    card.className = 'card' + (owned?'':' locked');
+    card.innerHTML = `
+      <div class="card-icon">${owned?'🎖':'🔒'}</div>
+      <div class="card-body">
+        <div class="card-title">${owned?t.name:'？？？'}</div>
+        <div class="card-desc">${owned?titleSourceDesc(t):'達成条件は未解放のため非表示'}</div>
+      </div>
+      <div class="card-action">${owned?`<button class="title-equip-btn${equipped?' equipped':''}" data-equip="${t.id}">${equipped?'装着中':'装着'}</button>`:''}</div>
+    `;
+    list.appendChild(card);
+  });
+  list.querySelectorAll('[data-equip]').forEach(b=>b.addEventListener('click',e=>{
+    SFX.select();
+    const id = e.target.getAttribute('data-equip');
+    save.equippedTitle = save.equippedTitle===id ? null : id;
+    persistSave(); renderTitles(); refreshMenuStats();
+  }));
+}
+function titleSourceDesc(t){
+  const [kind, key] = t.source.split(':');
+  if(kind==='achievement'){
+    const a = ACHIEVEMENTS.find(x=>x.id===key);
+    return a ? '実績「'+a.name+'」の達成で獲得' : '実績達成で獲得';
+  }
+  if(kind==='inferno') return '無限業火モードでウェーブ'+key.replace('wave','')+'到達で獲得';
+  if(kind==='dex') return '武具図鑑をすべて埋めて獲得';
+  if(kind==='daily') return 'デイリーチャレンジを'+key.replace('streak','')+'日連続達成で獲得';
+  return '';
+}
+
+/* ============================================================
+   無限業火モード UI
+============================================================ */
+function renderInfernoScreen(){
+  const unlocked = !!save.achievements['infernoUnlock'];
+  document.getElementById('infernoLockedView').style.display = unlocked ? 'none':'block';
+  document.getElementById('infernoUnlockedView').style.display = unlocked ? 'block':'none';
+  if(!unlocked){
+    const a = ACHIEVEMENTS.find(x=>x.id==='infernoUnlock');
+    document.getElementById('infernoLockDesc').textContent = a ? a.desc : '';
+    return;
+  }
+  document.getElementById('infernoBestWaveVal').textContent = save.infernoBestWave||0;
+  document.getElementById('infernoBestTimeVal').textContent = fmtTime(save.infernoBestTime||0);
+}
+
+/* ============================================================
    STAGE SELECT UI
 ============================================================ */
 function renderStageList(){
@@ -2758,7 +3219,7 @@ let game = null; // active run state
 let rafId = null;
 let lastT = 0;
 
-function newGame(){
+function newGame(isInferno){
   const charDef = CHARACTERS.find(c=>c.id===save.selectedChar) || CHARACTERS[0];
   const shopHpMul = 1 + (save.shopLevels.hp||0)*0.04;
   const shopDmgMul = 1 + (save.shopLevels.dmg||0)*0.03;
@@ -2777,6 +3238,9 @@ function newGame(){
     goal: pendingGoal || getGoalForRun(),
     goalDone:false, goalAnnounced:false,
     charDef,
+    isInferno: !!isInferno,
+    infernoWave: isInferno ? 1 : 0,
+    infernoWaveTimer: 0,
     player:{
       x:ARENA.w/2, y:ARENA.h/2, r:14,
       hp:baseHp, maxHp:baseHp,
@@ -2805,11 +3269,20 @@ function newGame(){
   updateGoalBanner();
   startAutosaveLoop();
   updateUltimateButton();
+  const waveHud = document.getElementById('infernoWaveHud');
+  if(waveHud){
+    waveHud.classList.toggle('active', !!isInferno);
+    document.getElementById('infernoWaveNum').textContent = 1;
+  }
+  document.getElementById('goalBanner').style.display = isInferno ? 'none' : '';
 }
+
 
 function addOrLevelWeapon(id){
   if(!game.weapons[id]) game.weapons[id] = {lv:1, cd:0};
   else if(game.weapons[id].lv < WEAPONS[id].maxLv) game.weapons[id].lv++;
+  if(!save.weaponDex[id]) save.weaponDex[id] = {owned:true, evolved:false};
+  else save.weaponDex[id].owned = true;
 }
 function addOrLevelPassive(id){
   if(!game.passives[id]) game.passives[id] = {lv:1};
@@ -2862,6 +3335,8 @@ function canEvolve(wId){
 function evolveWeapon(wId){
   game.weapons[wId].evolved = true;
   game.evolvedCount++;
+  if(!save.weaponDex[wId]) save.weaponDex[wId] = {owned:true, evolved:true};
+  else save.weaponDex[wId].evolved = true;
   const isSig = game.charDef.startWeapon === wId;
   SFX.evolve();
   if(isSig){
@@ -2903,6 +3378,14 @@ const BOSS_TYPES = [
 
 function timeScale(){
   const minutes = game.t/60;
+  if(game.isInferno){
+    // 無限業火モード：ウェーブが上がるごとに急勾配で強くなる、時間経過でも常に上昇し続ける
+    const wave = game.infernoWave||0;
+    const hpMul  = 1 + minutes*0.22 + wave*0.35 + Math.pow(Math.max(0,minutes-3)*0.06,2);
+    const dmgMul = 1 + minutes*0.14 + wave*0.22;
+    const spawnInterval = Math.max(0.10, 0.85 - minutes*0.035 - wave*0.025);
+    return { hp: hpMul, dmg: dmgMul, spawn: spawnInterval };
+  }
   const worldIdx = game.stageState.worldIdx;
   const stageIdx = game.stageState.stageIdx;
   const phase = worldIdx + stageIdx*0.3;
@@ -2938,7 +3421,7 @@ function spawnEnemy(forceBoss){
   const y = game.player.y + Math.sin(ang)*dist;
 
   let type, isBoss=false;
-  if(forceBoss){
+  if(forceBoss && sd.bossId){
     const bt = BOSS_TYPES.find(b=>b.id===sd.bossId) || BOSS_TYPES[0];
     type = bt;
     isBoss = true;
@@ -2947,14 +3430,15 @@ function spawnEnemy(forceBoss){
     type = pickEnemyType();
   }
 
-  const worldBonus  = 1 + world.worldNum * 0.3;
-  const stageBonus  = 1 + sd.stageNum  * 0.15;
+  const worldBonus  = game.isInferno ? (1 + (game.infernoWave||0) * 0.18) : (1 + world.worldNum * 0.3);
+  const stageBonus  = game.isInferno ? 1 : (1 + sd.stageNum  * 0.15);
+  const spdWorldBonus = game.isInferno ? (1 + (game.infernoWave||0) * 0.025) : (1 + world.worldNum*0.07);
 
   const enemy = {
     type:type.id, x, y, r:type.r,
     hp:   type.hp * ts.hp * worldBonus * stageBonus,
     maxHp:type.hp * ts.hp * worldBonus * stageBonus,
-    spd:  type.spd*(1+world.worldNum*0.07),
+    spd:  type.spd*spdWorldBonus,
     dmg:  type.dmg * ts.dmg * worldBonus,
     xp:type.xp,
     isBoss, color:type.icon,
@@ -4040,6 +4524,7 @@ function updateGoalBanner(){
   const banner = document.getElementById('goalBanner');
   const textEl = document.getElementById('goalBannerText');
   if(!game) return;
+  if(game.isInferno) return;
   if(game.goalDone){
     banner.classList.add('done');
     textEl.innerHTML = '達成！<b>'+game.goal.label+'</b>生存 ✔　このまま続けて記録更新へ';
@@ -4050,6 +4535,7 @@ function updateGoalBanner(){
   }
 }
 function checkGoal(){
+  if(game.isInferno) return;
   if(!game.goalDone && game.t >= game.goal.target){
     game.goalDone = true;
     SFX.goalDone();
@@ -4096,21 +4582,31 @@ function update(dt){
   const ts = timeScale();
   const world = getCurrentWorld();
   const sd = getCurrentStageData();
-  const worldIdx = game.stageState.worldIdx;
-  const stageIdx = game.stageState.stageIdx;
+  const worldIdx = game.isInferno ? Math.floor(game.infernoWave/3) : game.stageState.worldIdx;
+  const stageIdx = game.isInferno ? (game.infernoWave%3) : game.stageState.stageIdx;
 
   if(game.spawnTimer<=0){
     game.spawnTimer = ts.spawn;
     const baseCount = 1 + Math.floor(game.t/30) + worldIdx + stageIdx;
-    const maxCount  = 3 + worldIdx*3 + stageIdx;
+    const maxCount  = game.isInferno ? (4 + game.infernoWave*2) : (3 + worldIdx*3 + stageIdx);
     const count = Math.min(baseCount, maxCount);
     for(let i=0;i<count;i++) spawnEnemy(false);
   }
 
-  // ステージ内でボスを1体スポーン（ステージ開始から goalSec 秒後）
-  game.stageState.stageTimer += dt;
-  if(!game.stageState.bossSpawned && game.stageState.stageTimer >= sd.goalSec){
-    spawnEnemy(true);
+  if(game.isInferno){
+    // 無限業火モード：ボスは出現せず、一定時間ごとにウェーブが上昇する
+    game.infernoWaveTimer += dt;
+    if(game.infernoWaveTimer >= INFERNO_WAVE_DURATION){
+      game.infernoWaveTimer = 0;
+      game.infernoWave++;
+      onInfernoWaveUp();
+    }
+  } else {
+    // ステージ内でボスを1体スポーン（ステージ開始から goalSec 秒後）
+    game.stageState.stageTimer += dt;
+    if(!game.stageState.bossSpawned && game.stageState.stageTimer >= sd.goalSec){
+      spawnEnemy(true);
+    }
   }
 
   updateWeapons(dt);
@@ -4551,7 +5047,7 @@ function updateHUD(){
   document.getElementById('hudKills').textContent = game.kills;
   document.getElementById('hudShards').textContent = game.shardsEarned;
   const w = getCurrentWorld(); const sd = getCurrentStageData();
-  document.getElementById('hudStage').textContent = w.worldNum+'-'+sd.stageNum+' '+w.name;
+  document.getElementById('hudStage').textContent = game.isInferno ? ('🔥 '+w.name) : (w.worldNum+'-'+sd.stageNum+' '+w.name);
   updateGoalBanner();
 }
 
@@ -4576,8 +5072,8 @@ function hideAllOverlays(){
   document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('active'));
 }
 
-function startRun(){
-  newGame();
+function startRun(isInferno){
+  newGame(isInferno);
   showScreen('screen-game');
   lastT = 0;
   if(rafId) cancelAnimationFrame(rafId);
@@ -4592,13 +5088,18 @@ function togglePause(forceState){
   if(newPaused) SFX.button();
   if(newPaused){ BGM.stop(); } else { BGM.playBattle(); }
   if(newPaused){
-    const remain = Math.max(0, game.goal.target-game.t);
-    document.getElementById('pauseGoalRow').className='goal-result-row '+(game.goalDone?'success':'');
-    document.getElementById('pauseGoalRow').innerHTML = game.goalDone
-      ? '🎯 目標達成済み！記録更新を目指そう'
-      : '🎯 目標まで残り <b>'+fmtTime(remain)+'</b>（'+game.goal.label+'生存）';
+    if(game.isInferno){
+      document.getElementById('pauseGoalRow').className='goal-result-row success';
+      document.getElementById('pauseGoalRow').innerHTML = '🔥 現在 <b>WAVE '+game.infernoWave+'</b>　生存時間 <b>'+fmtTime(game.t)+'</b>';
+    } else {
+      const remain = Math.max(0, game.goal.target-game.t);
+      document.getElementById('pauseGoalRow').className='goal-result-row '+(game.goalDone?'success':'');
+      document.getElementById('pauseGoalRow').innerHTML = game.goalDone
+        ? '🎯 目標達成済み！記録更新を目指そう'
+        : '🎯 目標まで残り <b>'+fmtTime(remain)+'</b>（'+game.goal.label+'生存）';
+    }
     // 報酬プレビュー
-    const previewGems = game.t < 60 ? 0 : 4 + Math.floor(game.t/60)*2 + game.bossesKilled*5 + (game.goalDone?8:0);
+    const previewGems = game.t < 60 ? 0 : 4 + Math.floor(game.t/60)*2 + game.bossesKilled*5 + (game.goalDone?8:0) + (game.isInferno?(game.infernoWave||0)*3:0);
     const previewShards = game.t < 60 ? 0 : game.shardsEarned;
     document.getElementById('pauseShards').textContent = game.t < 60 ? '0（60秒未満）' : previewShards;
     document.getElementById('pauseGems').textContent = previewGems;
@@ -4817,10 +5318,14 @@ async function endGame(survived){
   BGM.stop();
   SFX.death();
 
+  const isFinalStageRun = !game.isInferno && game.stageState.worldIdx===WORLDS.length-1
+    && game.stageState.stageIdx===WORLDS[WORLDS.length-1].stages.length-1;
+
   const result = {
     time: game.t, level: game.level, kills: game.kills,
     evolved: game.evolvedCount, bosses: game.bossesKilled, maxNoHitTime: game.maxNoHitTime,
     totalKills: save.totalKills, totalRuns: save.totalRuns, totalBosses: save.totalBosses,
+    isFinalStageRun,
   };
 
   save.totalKills += game.kills;
@@ -4829,39 +5334,60 @@ async function endGame(survived){
   // gacha gems trickle in from runs too, so gacha-exclusive characters stay reachable through play
   // 60秒未満は報酬なし（すぐ終了して繰り返す荒稼ぎ防止）
   const MIN_REWARD_TIME = 60;
+  const infernoBonusGems = game.isInferno ? (game.infernoWave||0)*3 : 0;
   const gemsEarned = game.t < MIN_REWARD_TIME ? 0 :
-    4 + Math.floor(game.t/60)*2 + game.bossesKilled*5 + (game.goalDone?8:0);
+    4 + Math.floor(game.t/60)*2 + game.bossesKilled*5 + (game.goalDone?8:0) + infernoBonusGems;
   const shardsActual = game.t < MIN_REWARD_TIME ? 0 : game.shardsEarned;
   if(game.t >= MIN_REWARD_TIME){
     save.shards += game.shardsEarned;
     save.gems += gemsEarned;
   }
   let newBest = false;
-  if(game.t > save.bestTime){ save.bestTime = game.t; newBest = true; }
+  if(!game.isInferno && game.t > save.bestTime){ save.bestTime = game.t; newBest = true; }
 
-  // achievements
+  // 無限業火モード：自己ベスト更新
+  let infernoNewBest = false;
+  if(game.isInferno){
+    if(game.infernoWave > (save.infernoBestWave||0)){ save.infernoBestWave = game.infernoWave; infernoNewBest = true; }
+    if(game.t > (save.infernoBestTime||0)){ save.infernoBestTime = game.t; infernoNewBest = true; }
+  }
+
+  // achievements（無限業火モード中は通常実績の評価対象外。記録の整合性を保つため）
   const unlockedNow = [];
-  ACHIEVEMENTS.forEach(a=>{
-    if(!save.achievements[a.id] && a.check(result)){
-      save.achievements[a.id] = true;
-      save.shards += a.reward;
-      unlockedNow.push(a);
-    }
-  });
+  if(!game.isInferno){
+    ACHIEVEMENTS.forEach(a=>{
+      if(!save.achievements[a.id] && a.check(result)){
+        save.achievements[a.id] = true;
+        save.shards += a.reward;
+        unlockedNow.push(a);
+      }
+    });
+  }
+
+  // 称号チェック（実績・インフェルノ記録・図鑑コンプ・デイリー連続達成のいずれかで解放）
+  const newTitles = checkAndGrantTitles();
+
+  // デイリーチャレンジの進行更新
+  updateDailyProgressFromResult(result);
 
   await persistSave();
   refreshMenuStats();
 
   document.getElementById('overTitle').textContent = survived ? 'バトル終了' : '力尽きた…';
-  document.getElementById('overGoalRow').className = 'goal-result-row ' + (game.goalDone?'success':'fail');
-  document.getElementById('overGoalRow').innerHTML = game.goalDone
-    ? '🎯 目標達成：'+game.goal.label+'生存 ✔'
-    : '🎯 目標未達成：'+game.goal.label+'生存（あと '+fmtTime(Math.max(0,game.goal.target-game.t))+'）';
+  if(game.isInferno){
+    document.getElementById('overGoalRow').className = 'goal-result-row success';
+    document.getElementById('overGoalRow').innerHTML = '🔥 到達ウェーブ：<b>'+game.infernoWave+'</b>'+(infernoNewBest?'　<span style="color:var(--gold);">✨自己ベスト更新！</span>':'');
+  } else {
+    document.getElementById('overGoalRow').className = 'goal-result-row ' + (game.goalDone?'success':'fail');
+    document.getElementById('overGoalRow').innerHTML = game.goalDone
+      ? '🎯 目標達成：'+game.goal.label+'生存 ✔'
+      : '🎯 目標未達成：'+game.goal.label+'生存（あと '+fmtTime(Math.max(0,game.goal.target-game.t))+'）';
+  }
   document.getElementById('resTime').textContent = fmtTime(game.t);
   document.getElementById('resLv').textContent = game.level;
   document.getElementById('resKills').textContent = game.kills;
   document.getElementById('resShards').textContent = shardsActual;
-  document.getElementById('resNewBest').style.display = newBest ? 'block':'none';
+  document.getElementById('resNewBest').style.display = (newBest||infernoNewBest) ? 'block':'none';
 
   const unlockBox = document.getElementById('resAchUnlocks');
   unlockBox.innerHTML='';
@@ -4876,7 +5402,13 @@ async function endGame(survived){
     d.innerHTML = `<span style="font-size:18px;">${a.icon}</span><div><b>実績解除：${a.name}</b><br><span style="color:var(--text-dim)">+✦${a.reward}</span></div>`;
     unlockBox.appendChild(d);
   });
-  if(unlockedNow.length) SFX.achieve();
+  newTitles.forEach(t=>{
+    const d = document.createElement('div');
+    d.style.cssText='background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.3);border-radius:10px;padding:8px 10px;font-size:12px;display:flex;align-items:center;gap:8px;';
+    d.innerHTML = `<span style="font-size:18px;">🎖</span><div><b>称号獲得：${t.name}</b></div>`;
+    unlockBox.appendChild(d);
+  });
+  if(unlockedNow.length || newTitles.length) SFX.achieve();
 
   document.getElementById('overlayOver').classList.add('active');
   if(rafId) cancelAnimationFrame(rafId);
@@ -4890,9 +5422,22 @@ document.getElementById('btnStageSelect').addEventListener('click', ()=>{ SFX.bu
 document.getElementById('btnCharSelect').addEventListener('click', ()=>{ SFX.button(); renderCharList(); showScreen('screen-char'); });
 document.getElementById('btnShop').addEventListener('click', ()=>{ SFX.button(); renderShop(); showScreen('screen-shop'); });
 document.getElementById('btnAch').addEventListener('click', ()=>{ SFX.button(); renderAch(); showScreen('screen-ach'); });
+document.getElementById('btnDex').addEventListener('click', ()=>{ SFX.button(); renderDex(); showScreen('screen-dex'); });
+document.getElementById('btnTitles').addEventListener('click', ()=>{ SFX.button(); renderTitles(); showScreen('screen-titles'); });
+document.getElementById('btnDaily').addEventListener('click', ()=>{ SFX.button(); renderDaily(); showScreen('screen-daily'); });
+document.getElementById('btnInferno').addEventListener('click', ()=>{ SFX.button(); renderInfernoScreen(); showScreen('screen-inferno'); });
+document.getElementById('btnInfernoStart').addEventListener('click', ()=>{
+  SFX.open();
+  pendingGoal = null;
+  startRun(true);
+});
 document.getElementById('charBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
 document.getElementById('shopBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
 document.getElementById('achBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
+document.getElementById('dexBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
+document.getElementById('titlesBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
+document.getElementById('dailyBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
+document.getElementById('infernoBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
 document.getElementById('stageBack').addEventListener('click', ()=>{ SFX.close(); showScreen('screen-menu'); });
 
 document.getElementById('btnMuteToggle').addEventListener('click', ()=>{
@@ -4937,7 +5482,11 @@ document.getElementById('btnQuit').addEventListener('click', ()=>{
   game.goalDone = game.goalDone || false; // 目標未達はそのまま
   endGame(true);
 });
-document.getElementById('btnRetry').addEventListener('click', ()=>{ SFX.button(); openGoalScreen(); });
+document.getElementById('btnRetry').addEventListener('click', ()=>{
+  SFX.button();
+  if(game && game.isInferno){ pendingGoal = null; startRun(true); }
+  else openGoalScreen();
+});
 document.getElementById('btnBackMenu').addEventListener('click', ()=>{ SFX.button(); hideAllOverlays(); BGM.stop(); showScreen('screen-menu'); setTimeout(()=>BGM.playMenu(),700); });
 
 /* ============================================================
@@ -5027,6 +5576,9 @@ document.getElementById('adminResetSave').addEventListener('click', ()=>{
     selectedWorldIdx:0, selectedStageIdx:0,
     adminGameSpeed:1,
     hideLevelUpWhenMaxed:false,
+    infernoBestWave:0, infernoBestTime:0, infernoUnlocked:false,
+    weaponDex:{}, titles:[], equippedTitle:null,
+    dailyDate:null, dailyProgress:{}, dailyClaimed:{}, dailyStreak:0, dailyLastClaimDate:null,
   };
   refreshMenuStats(); renderCharList(); renderShop(); renderAch(); persistSave();
   closeAdminPanel();
